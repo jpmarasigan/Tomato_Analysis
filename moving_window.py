@@ -2,11 +2,14 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 import pandas as pd
 import datetime
+import os 
 
 cred = credentials.Certificate("./private/agripedia-c5439-firebase-adminsdk-6u9cs-65edf0294b.json")
 firebase_admin.initialize_app(cred)
 
 db = firestore.client()          # Initialize Firestore client
+is_append = False
+
 
 def get_last_fetched_timestamp():
     try:
@@ -25,6 +28,8 @@ def save_last_fetched_timestamp(timestamp):
 
 
 def fetch_data(collection_name):
+    global is_append
+
     try:
         now = datetime.date.today()
         date_now_string = now.strftime("%Y-%m-%d")
@@ -41,8 +46,10 @@ def fetch_data(collection_name):
         # Decision for fetching firestore data
         if last_fetched_date:
             docs = collection_ref.order_by('__name__').start_after([last_fetched_date]).stream()
+            is_append = True
         else:
             docs = collection_ref.stream()
+            is_append = False
         
         data_list = []  # Initialize an empty list to store data
 
@@ -69,26 +76,40 @@ def fetch_data(collection_name):
 def moving_window_analysis(df, window_size, column, interval):
     if window_size != 1: 
         df[f'{column}_{interval}_mean'] = df[column].rolling(window=window_size).mean()
-    df[f'{column}_{interval}_std'] = df[column].rolling(window=window_size).std()
+        df[f'{column}_{interval}_std'] = df[column].rolling(window=window_size).std()
     df[f'{column}_{interval}_rate_change'] = df[column].pct_change(periods=window_size)
     return df
 
 
-if __name__ == "__main__":
-    data_list = fetch_data("CropDataPerDay")
+def save_analysis(latest_df, is_append):
+    if is_append:
+        existing_df = pd.read_csv("original.txt", sep='\s+')
+        latest_df = pd.concat([existing_df, latest_df], ignore_index=True)  
+        
+    with open("original.txt", "w") as f:
+        f.write(latest_df.to_string())
 
+
+def main():
+    data_list = fetch_data("CropDataPerDay")
+    
     if not data_list:
         print("No data fetched")
-    else:
-        df = pd.DataFrame(data_list) 
-        # Reorder columns to have 'date' first
-        df = df[['date'] + [col for col in df.columns if col != 'date']]          
-        
-        # Convert 'temperature' column to numeric
-        df['temperature'] = pd.to_numeric(df['temperature'], errors='coerce')
-        
-        # Get MA of daily
-        df = moving_window_analysis(df, 1, 'temperature', 'daily')
-        
-        with open('original.txt', 'w') as f:
-            f.write(df.to_string())
+        return
+    
+    df = pd.DataFrame(data_list) 
+    # Reorder columns to have 'date' first
+    df = df[['date'] + [col for col in df.columns if col != 'date']]          
+    
+    # Convert 'temperature' column to numeric
+    df['temperature'] = pd.to_numeric(df['temperature'], errors='coerce')
+    
+    # Get MA of daily
+    df = moving_window_analysis(df, 1, 'temperature', 'daily')
+
+    save_analysis(df, is_append=is_append)
+
+
+# MAIN FUNCTION
+if __name__ == "__main__":
+    main()
