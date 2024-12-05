@@ -1,0 +1,33 @@
+                                                  temperature_condition  temperature_daily_mean  temperature_weekly_mean  temperature_monthly_mean
+0                 {'daily': 'Healthy', 'weekly': None, 'monthly': None}                   18.00                      NaN                       NaN
+1                 {'daily': 'Healthy', 'weekly': None, 'monthly': None}                   19.00                      NaN                       NaN
+2                 {'daily': 'Healthy', 'weekly': None, 'monthly': None}                   18.00                      NaN                       NaN
+3                 {'daily': 'Healthy', 'weekly': None, 'monthly': None}                   18.00                      NaN                       NaN
+4                 {'daily': 'Healthy', 'weekly': None, 'monthly': None}                   18.00                      NaN                       NaN
+5             {'daily': 'Not Healthy', 'weekly': None, 'monthly': None}                   16.00                      NaN                       NaN
+6        {'daily': 'Healthy', 'weekly': 'Not Healthy', 'monthly': None}                   18.00                17.857143                       NaN
+7            {'daily': 'Healthy', 'weekly': 'Healthy', 'monthly': None}                   19.34                18.048571                       NaN
+8    {'daily': 'Not Healthy', 'weekly': 'Not Healthy', 'monthly': None}                   12.10                17.062857                       NaN
+9    {'daily': 'Not Healthy', 'weekly': 'Not Healthy', 'monthly': None}                   17.33                16.967143                       NaN
+10   {'daily': 'Not Healthy', 'weekly': 'Not Healthy', 'monthly': None}                   16.79                16.794286                       NaN
+11       {'daily': 'Healthy', 'weekly': 'Not Healthy', 'monthly': None}                   19.48                17.005714                       NaN
+12   {'daily': 'Not Healthy', 'weekly': 'Not Healthy', 'monthly': None}                   14.70                16.820000                       NaN
+13   {'daily': 'Not Healthy', 'weekly': 'Not Healthy', 'monthly': None}                   11.74                15.925714                       NaN
+14       {'daily': 'Healthy', 'weekly': 'Not Healthy', 'monthly': None}                   18.00                15.734286                       NaN
+15       {'daily': 'Healthy', 'weekly': 'Not Healthy', 'monthly': None}                   18.00                16.577143                       NaN
+16       {'daily': 'Healthy', 'weekly': 'Not Healthy', 'monthly': None}                   18.00                16.672857                       NaN
+17       {'daily': 'Healthy', 'weekly': 'Not Healthy', 'monthly': None}                   18.00                16.845714                       NaN
+18       {'daily': 'Healthy', 'weekly': 'Not Healthy', 'monthly': None}                   18.00                16.634286                       NaN
+19       {'daily': 'Healthy', 'weekly': 'Not Healthy', 'monthly': None}                   18.00                17.105714                       NaN
+20           {'daily': 'Healthy', 'weekly': 'Healthy', 'monthly': None}                   18.00                18.000000                       NaN
+21           {'daily': 'Healthy', 'weekly': 'Healthy', 'monthly': None}                   18.00                18.000000                       NaN
+22           {'daily': 'Healthy', 'weekly': 'Healthy', 'monthly': None}                   18.00                18.000000                       NaN
+23           {'daily': 'Healthy', 'weekly': 'Healthy', 'monthly': None}                   18.00                18.000000                       NaN
+24           {'daily': 'Healthy', 'weekly': 'Healthy', 'monthly': None}                   18.00                18.000000                       NaN
+25           {'daily': 'Healthy', 'weekly': 'Healthy', 'monthly': None}                   18.00                18.000000                       NaN
+26   {'daily': 'Not Healthy', 'weekly': 'Not Healthy', 'monthly': None}                   17.00                17.857143                       NaN
+27           {'daily': 'Healthy', 'weekly': 'Healthy', 'monthly': None}                   22.00                18.428571                       NaN
+28       {'daily': 'Not Healthy', 'weekly': 'Healthy', 'monthly': None}                   26.00                19.571429                       NaN
+29  {'daily': 'Healthy', 'weekly': 'Healthy', 'monthly': 'Not Healthy'}                   21.00                20.000000                 17.949333
+30  {'daily': 'Healthy', 'weekly': 'Healthy', 'monthly': 'Not Healthy'}                   19.00                20.142857                 17.982667
+31  {'daily': 'Not Healthy', 'weekly': 'Healthy', 'monthly': 'Healthy'}                   35.00                22.571429                 18.516000
