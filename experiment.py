@@ -1,21 +1,23 @@
 import os
 import json
+import pandas as pd
 
-new_entry = {
-    "2025-02-04": {
-        "humidity": "60.0",
-        "lightIntensity": "50",
-        "soilMoisture": "40",
-        "temperature": "35.0"
-    }
+
+data = {
+    "date": ["2024-12-02", "2024-12-03", "2024-12-04"],
+    "humidity": [57.7, 59.9, 56.8],
+    "soilMoisture": [41, 50, 43],
+    "lightIntensity": [64, 68, 67],
+    "temperature": [30.3, 31.7, 34.2],
+    "temperature_daily_rate_change": [None, 0.046205, 0.078864]
 }
 
-file_path = './private/tomato_firebase_sensor_data.json'
+df = pd.DataFrame(data)
 
-with open(file_path, "r+") as f:
-    data = json.load(f)
-    data.update(new_entry)
-    f.seek(0)
-    json.dump(data, f, indent=4)
-    f.truncate()
+for index, row in df.iterrows():
+    row_data = row.drop(labels='date')
+    print(row_data)
+    # Save or process row_data here
+
+
 

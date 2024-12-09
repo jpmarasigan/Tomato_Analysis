@@ -45,7 +45,7 @@ def fetch_data(collection_name):
     
         # Decision for fetching firestore data
         if last_fetched_date:
-            docs = collection_ref.order_by('__name__').start_after([last_fetched_date]).stream()
+            docs = collection_ref.order_by('__name__').start_at([last_fetched_date]).stream()
             is_append = True
         else:
             docs = collection_ref.stream()
@@ -82,12 +82,20 @@ def moving_window_analysis(df, window_size, column, interval):
 
 
 def save_analysis(latest_df, is_append):
-    if is_append:
-        existing_df = pd.read_csv("original.txt", sep='\s+')
-        latest_df = pd.concat([existing_df, latest_df], ignore_index=True)  
+    # Save to firestore database
+    for _, row in latest_df.iterrows():
+        try:
+            if is_append:   # Skip the last date to avoid NaN values in rate of change
+                is_append = False
+                continue
+            doc_ref = db.collection("Analysis").document(row['date'])
+            # drop date value
+            row_data_without_date = row.drop(labels='date')
+            doc_ref.set(row_data_without_date.to_dict(), merge=True)
+        except Exception as e:
+            print(f"An error occured: {e}")
         
-    with open("original.txt", "w") as f:
-        f.write(latest_df.to_string())
+    print(f"Data added to Document (Analysis): {latest_df}")
 
 
 def main():
@@ -113,3 +121,23 @@ def main():
 # MAIN FUNCTION
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
+
+
+
+
+
+
+
+# def save_analysis(latest_df, is_append):
+#     if is_append:
+#         existing_df = pd.read_csv("original.txt", sep='\s+')
+#         latest_df = pd.concat([existing_df, latest_df], ignore_index=True)  
+        
+#     with open("original.txt", "w") as f:
+#         f.write(latest_df.to_string())
