@@ -9,7 +9,7 @@ firebase_admin.initialize_app(cred)
 
 db = firestore.client()          # Initialize Firestore client
 is_append = False
-
+last_fetched_date = None
 
 def get_last_fetched_timestamp():
     try:
@@ -28,7 +28,7 @@ def save_last_fetched_timestamp(timestamp):
 
 
 def fetch_data(collection_name):
-    global is_append
+    global is_append, last_fetched_date
 
     try:
         now = datetime.date.today()
@@ -39,6 +39,7 @@ def fetch_data(collection_name):
         if last_fetched_date:
             if last_fetched_date.strip() == date_now_string.strip():
                 print("No new data")
+                is_append = False
                 return 
         
         collection_ref = db.collection(collection_name)
@@ -73,11 +74,70 @@ def fetch_data(collection_name):
 
 
 # Define a function to calculate moving window statistics
-def moving_window_analysis(df, window_size, column, interval):
-    if window_size != 1: 
+def ma_analysis(df, column, window_size, interval, is_append):
+    global last_fetched_date
+
+    if window_size == 1:
+        df[f'{column}_{interval}_rate_change'] = df[column].pct_change(periods=1)        
+        return df
+    
+    if not is_append and not last_fetched_date:
         df[f'{column}_{interval}_mean'] = df[column].rolling(window=window_size).mean()
         df[f'{column}_{interval}_std'] = df[column].rolling(window=window_size).std()
-    df[f'{column}_{interval}_rate_change'] = df[column].pct_change(periods=window_size)
+        df[f'{column}_{interval}_rate_change'] = df[column].pct_change(periods=window_size)
+    else:
+        if last_fetched_date:
+            date = datetime.datetime.strptime(last_fetched_date, "%Y-%m-%d").date()
+            seven_days_ago = date - datetime.timedelta(days=window_size) 
+            seven_days_ago = seven_days_ago.strftime('%Y-%m-%d')
+
+            collection_ref = db.collection("CropDataPerDay")
+            docs = collection_ref.order_by('__name__').start_at([seven_days_ago]).stream()
+            
+            append_data_list = []
+            for doc in docs:
+                data = doc.to_dict()
+                data['date'] = doc.id
+                append_data_list.append(data)
+
+            append_df = pd.DataFrame(append_data_list)
+
+            append_df[column] = pd.to_numeric(append_df[column], errors='coerce')
+
+            append_df[f'{column}_{interval}_mean'] = append_df[column].rolling(window=window_size).mean()
+            append_df[f'{column}_{interval}_std'] = append_df[column].rolling(window=window_size).std()
+            append_df[f'{column}_{interval}_rate_change'] = append_df[column].pct_change(periods=window_size)
+
+            # Append to the previous df
+            df.set_index('date', inplace=True)
+            append_df.set_index('date', inplace=True)
+
+            # Use combine_first to merge and fill NaN values
+            df = df.combine_first(append_df)
+
+            df.reset_index(inplace=True)
+
+            # df = pd.concat([df, append_df], ignore_index=True)
+            # df.drop_duplicates(subset=['date'], keep='first', inplace=True)
+
+            # # TROUBLESHOOT PURPOSES
+            # with open("data.txt", "w") as f:
+            #     f.write(df.to_string(index=False))
+
+            # Filter the new data to last fetched time onwards
+            df['date'] = pd.to_datetime(df['date']).dt.date
+            cutoff_date = pd.to_datetime(last_fetched_date).date()
+            df = df[df['date'] >= cutoff_date]
+
+            # Convert to date only
+            df['date'] = pd.to_datetime(df['date']).dt.date
+            # Convert the date column back to string format
+            df['date'] = df['date'].astype(str)
+
+            # TROUBLESHOOT PURPOSES
+            with open("combined.txt", "w") as f:
+                f.write(df.to_string())
+                
     return df
 
 
@@ -113,7 +173,9 @@ def main():
     df['temperature'] = pd.to_numeric(df['temperature'], errors='coerce')
     
     # Get MA of daily
-    df = moving_window_analysis(df, 1, 'temperature', 'daily')
+    df = ma_analysis(df, 'temperature', 1, 'daily', is_append=is_append)
+    df = ma_analysis(df, 'temperature', 7, 'weekly', is_append=is_append)
+    df = ma_analysis(df, 'temperature', 30, 'monthly', is_append=is_append)
 
     save_analysis(df, is_append=is_append)
 
@@ -121,23 +183,3 @@ def main():
 # MAIN FUNCTION
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-# def save_analysis(latest_df, is_append):
-#     if is_append:
-#         existing_df = pd.read_csv("original.txt", sep='\s+')
-#         latest_df = pd.concat([existing_df, latest_df], ignore_index=True)  
-        
-#     with open("original.txt", "w") as f:
-#         f.write(latest_df.to_string())
