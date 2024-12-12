@@ -20,6 +20,22 @@ def get_last_fetched_timestamp():
         return None
 
 
+def reorder_and_filter_columns(df):
+    preferred_columns_and_order = [
+        'temperature_daily_rate_change',
+        'temperature_weekly_mean',
+        'temperature_weekly_std', 
+        'temperature_weekly_rate_change',
+        'temperature_monthly_mean',
+        'temperature_monthly_std',
+        'temperature_monthly_rate_change',        
+    ]
+    df = df[preferred_columns_and_order]    
+
+    return df
+
+
+
 last_fetched_date = get_last_fetched_timestamp()
 
 date = datetime.datetime.strptime(last_fetched_date, "%Y-%m-%d").date()
@@ -36,5 +52,6 @@ for doc in docs:
     data_list.append(data)
 
 df = pd.DataFrame(data_list)
+df = reorder_and_filter_columns(df)
 
-print(df)
+print(df.columns)

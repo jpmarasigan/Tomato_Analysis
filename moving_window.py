@@ -2,7 +2,9 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 import pandas as pd
 import datetime
-import os 
+import numpy as np
+import skfuzzy as fuzz
+from skfuzzy import control as ctrl
 
 cred = credentials.Certificate("./private/agripedia-c5439-firebase-adminsdk-6u9cs-65edf0294b.json")
 firebase_admin.initialize_app(cred)
@@ -77,7 +79,11 @@ def fetch_data(collection_name):
 def ma_analysis(df, column, window_size, interval, is_append):
     global last_fetched_date
 
+    # Ensure the column is numeric
+    df[column] = pd.to_numeric(df[column], errors='coerce')
+
     if window_size == 1:
+        df[f'{column}_{interval}_mean'] = df[column].rolling(window=1).mean()
         df[f'{column}_{interval}_rate_change'] = df[column].pct_change(periods=1)        
         return df
     
@@ -141,6 +147,45 @@ def ma_analysis(df, column, window_size, interval, is_append):
     return df
 
 
+def reorder_and_filter_columns(df):
+    columns_to_remove = [
+        'humidity',
+        'soilMoisture',
+        'lightIntensity',      
+        'temperature'
+    ]
+
+    preferred_column_order = [
+        'date', 
+        # Humidity
+        'humidity_daily_mean', 'humidity_daily_rate_change', 'humidity_monthly_mean', 'humidity_monthly_rate_change', 'humidity_monthly_std', 
+        'humidity_weekly_mean', 'humidity_weekly_rate_change', 'humidity_weekly_std', 
+        # Light Intensity 
+        'lightIntensity_daily_mean', 'lightIntensity_daily_rate_change',        
+        'lightIntensity_monthly_mean', 'lightIntensity_monthly_rate_change', 'lightIntensity_monthly_std',
+        'lightIntensity_weekly_mean', 'lightIntensity_weekly_rate_change', 'lightIntensity_weekly_std',
+        # Soil Moisture 
+        'soilMoisture_daily_mean', 'soilMoisture_daily_rate_change', 
+        'soilMoisture_monthly_mean', 'soilMoisture_monthly_rate_change', 'soilMoisture_monthly_std',
+        'soilMoisture_weekly_mean', 'soilMoisture_weekly_rate_change', 'soilMoisture_weekly_std', 
+        # Temperature 
+        'temperature_daily_mean', 'temperature_daily_rate_change',
+        'temperature_monthly_mean', 'temperature_monthly_rate_change', 'temperature_monthly_std',
+        'temperature_weekly_mean', 'temperature_weekly_rate_change', 'temperature_weekly_std',
+        # Statuses
+        'humidity_daily_status', 'humidity_weekly_status', 'humidity_monthly_status',
+        'lightIntensity_daily_status', 'lightIntensity_weekly_status', 'lightIntensity_monthly_status',
+        'soilMoisture_daily_status', 'soilMoisture_weekly_status', 'soilMoisture_monthly_status',
+        'temperature_daily_status', 'temperature_weekly_status', 'temperature_monthly_status'   
+    ]
+    # Drop columns of choice
+    df = df.drop(columns=columns_to_remove)    
+    # Rearrange based on preferred column
+    df = df[preferred_column_order]
+
+    return df
+
+
 def save_analysis(latest_df, is_append):
     # Save to firestore database
     for _, row in latest_df.iterrows():
@@ -158,6 +203,72 @@ def save_analysis(latest_df, is_append):
     print(f"Data added to Document (Analysis): {latest_df}")
 
 
+def compare_to_defined_values(value, column):
+    if pd.isna(value):
+        return np.nan
+    
+    if column == 'temperature':
+        if 38 < value < 33:
+            return 'good'
+        else:
+            return 'bad'
+    elif column == 'humidity':
+        if 38 < value < 33:
+            return 'good'
+        else:
+            return 'bad'
+    elif column == 'lightIntensity':
+        if 38 < value < 33:
+            return 'good'
+        else:
+            return 'bad'
+    elif column == 'soilMoisture':
+        if 38 < value < 33:
+            return 'good'
+        else:
+            return 'bad'
+
+
+def get_sensor_value_status(df, column):
+    for interval in ['daily', 'weekly', 'monthly']:
+        df[f'{column}_{interval}_status'] = df[f'{column}_{interval}_mean'].apply(lambda x: compare_to_defined_values(x, column))
+    return df
+
+
+def fuzzy_logic_overall_status(df):
+    # Define fuzzy variables
+    sensor_value = ctrl.Antecedent(np.arange(0, 101, 1), 'sensor_value')
+    status = ctrl.Consequent(np.arange(0, 101, 1), 'status')
+
+    # Define fuzzy membership functions
+    sensor_value['low'] = fuzz.trimf(sensor_value.universe, [0, 0, 50])
+    sensor_value['medium'] = fuzz.trimf(sensor_value.universe, [0, 50, 100])
+    sensor_value['high'] = fuzz.trimf(sensor_value.universe, [50, 100, 100])
+
+    status['unhealthy'] = fuzz.trimf(status.universe, [0, 0, 50])
+    status['healthy'] = fuzz.trimf(status.universe, [50, 100, 100])
+
+    # Define fuzzy rules
+    rule1 = ctrl.Rule(sensor_value['low'], status['unhealthy'])
+    rule2 = ctrl.Rule(sensor_value['medium'], status['healthy'])
+    rule3 = ctrl.Rule(sensor_value['high'], status['healthy'])
+
+    # Create control system
+    status_ctrl = ctrl.ControlSystem([rule1, rule2, rule3])
+    status_sim = ctrl.ControlSystemSimulation(status_ctrl)
+
+    # Apply fuzzy logic to overall status
+    df['overall_status'] = df[['temperature_status', 'humidity_status', 'lightIntensity_status', 'soilMoisture_status']].mean(axis=1)
+    df['overall_status'] = df['overall_status'].apply(lambda x: get_fuzzy_status(x, status_sim))
+
+    return df
+
+def get_fuzzy_status(value, status_sim):
+    status_sim.input['sensor_value'] = value
+    status_sim.compute()
+    return status_sim.output['status']
+
+
 def main():
     data_list = fetch_data("CropDataPerDay")
     
@@ -166,19 +277,34 @@ def main():
         return
     
     df = pd.DataFrame(data_list) 
+
     # Reorder columns to have 'date' first
     df = df[['date'] + [col for col in df.columns if col != 'date']]          
     
-    # Convert 'temperature' column to numeric
-    df['temperature'] = pd.to_numeric(df['temperature'], errors='coerce')
+    # Convert relevant columns to numeric
+    for column in ['temperature', 'humidity', 'lightIntensity', 'soilMoisture']:
+        df[column] = pd.to_numeric(df[column], errors='coerce')
     
-    # Get MA of daily
-    df = ma_analysis(df, 'temperature', 1, 'daily', is_append=is_append)
-    df = ma_analysis(df, 'temperature', 7, 'weekly', is_append=is_append)
-    df = ma_analysis(df, 'temperature', 30, 'monthly', is_append=is_append)
+    # Get MA of sensors output for daily, weekly, monthly
+    for column in ['temperature', 'humidity', 'lightIntensity', 'soilMoisture']:
+        df = ma_analysis(df, column, 1, 'daily', is_append=is_append)
+        df = ma_analysis(df, column, 7, 'weekly', is_append=is_append)
+        df = ma_analysis(df, column, 30, 'monthly', is_append=is_append)
+        df = get_sensor_value_status(df, column)
+
+    # # Apply fuzzy logic for overall status
+    # df = fuzzy_logic_overall_status(df)
+    
+    # Filter and rearrange the column order
+    df = reorder_and_filter_columns(df)
+        
+    with open("combined.txt", 'w') as f:
+        f.write(df.to_string())
 
     save_analysis(df, is_append=is_append)
 
+    # NEXT IS PLOT THE CHANGES IN STATS GRAPH
+    # FIND RELIABLE DATA FOR BAD, GOOD, HEALTHY DATA
 
 # MAIN FUNCTION
 if __name__ == "__main__":
