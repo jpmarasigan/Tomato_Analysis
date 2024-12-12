@@ -176,7 +176,8 @@ def reorder_and_filter_columns(df):
         'humidity_daily_status', 'humidity_weekly_status', 'humidity_monthly_status',
         'lightIntensity_daily_status', 'lightIntensity_weekly_status', 'lightIntensity_monthly_status',
         'soilMoisture_daily_status', 'soilMoisture_weekly_status', 'soilMoisture_monthly_status',
-        'temperature_daily_status', 'temperature_weekly_status', 'temperature_monthly_status'   
+        'temperature_daily_status', 'temperature_weekly_status', 'temperature_monthly_status',
+        'daily_overall_status', 'weekly_overall_status', 'monthly_overall_status', 'overall_status'  
     ]
     # Drop columns of choice
     df = df.drop(columns=columns_to_remove)    
@@ -235,38 +236,72 @@ def get_sensor_value_status(df, column):
     return df
 
 
+def classify_overall_status(value):
+    if value >= 60:
+        return 'good'
+    else:
+        return 'bad'
+
+
 def fuzzy_logic_overall_status(df):
-    # Define fuzzy variables
-    sensor_value = ctrl.Antecedent(np.arange(0, 101, 1), 'sensor_value')
-    status = ctrl.Consequent(np.arange(0, 101, 1), 'status')
+    def create_fuzzy_system():
+        # Define fuzzy variables
+        temperature_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'temperature_mean')
+        humidity_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'humidity_mean')
+        lightIntensity_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'lightIntensity_mean')
+        soilMoisture_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'soilMoisture_mean')
+        overall_status = ctrl.Consequent(np.arange(0, 101, 1), 'overall_status')
 
-    # Define fuzzy membership functions
-    sensor_value['low'] = fuzz.trimf(sensor_value.universe, [0, 0, 50])
-    sensor_value['medium'] = fuzz.trimf(sensor_value.universe, [0, 50, 100])
-    sensor_value['high'] = fuzz.trimf(sensor_value.universe, [50, 100, 100])
+        # Define fuzzy membership functions
+        for mean in [temperature_mean, humidity_mean, lightIntensity_mean, soilMoisture_mean]:
+            mean['low'] = fuzz.trimf(mean.universe, [0, 0, 50])
+            mean['medium'] = fuzz.trimf(mean.universe, [0, 50, 100])
+            mean['high'] = fuzz.trimf(mean.universe, [50, 100, 100])
 
-    status['unhealthy'] = fuzz.trimf(status.universe, [0, 0, 50])
-    status['healthy'] = fuzz.trimf(status.universe, [50, 100, 100])
+        overall_status['unhealthy'] = fuzz.trimf(overall_status.universe, [0, 0, 50])
+        overall_status['healthy'] = fuzz.trimf(overall_status.universe, [50, 100, 100])
 
-    # Define fuzzy rules
-    rule1 = ctrl.Rule(sensor_value['low'], status['unhealthy'])
-    rule2 = ctrl.Rule(sensor_value['medium'], status['healthy'])
-    rule3 = ctrl.Rule(sensor_value['high'], status['healthy'])
+        # Define fuzzy rules
+        rule1 = ctrl.Rule(temperature_mean['low'] | humidity_mean['low'] | lightIntensity_mean['low'] | soilMoisture_mean['low'], overall_status['unhealthy'])
+        rule2 = ctrl.Rule(temperature_mean['medium'] & humidity_mean['medium'] & lightIntensity_mean['medium'] & soilMoisture_mean['medium'], overall_status['healthy'])
+        rule3 = ctrl.Rule(temperature_mean['high'] & humidity_mean['high'] & lightIntensity_mean['high'] & soilMoisture_mean['high'], overall_status['healthy'])
 
-    # Create control system
-    status_ctrl = ctrl.ControlSystem([rule1, rule2, rule3])
-    status_sim = ctrl.ControlSystemSimulation(status_ctrl)
+        # Create control system
+        overall_status_ctrl = ctrl.ControlSystem([rule1, rule2, rule3])
+        return ctrl.ControlSystemSimulation(overall_status_ctrl)
 
-    # Apply fuzzy logic to overall status
-    df['overall_status'] = df[['temperature_status', 'humidity_status', 'lightIntensity_status', 'soilMoisture_status']].mean(axis=1)
-    df['overall_status'] = df['overall_status'].apply(lambda x: get_fuzzy_status(x, status_sim))
+    # Create fuzzy systems for daily, weekly, and monthly
+    daily_fuzzy_system = create_fuzzy_system()
+    weekly_fuzzy_system = create_fuzzy_system()
+    monthly_fuzzy_system = create_fuzzy_system()
+
+    # Apply fuzzy logic to overall status for each interval
+    df['daily_overall_status'] = df.apply(lambda row: get_fuzzy_status_combined(row, daily_fuzzy_system, 'daily'), axis=1)
+    df['weekly_overall_status'] = df.apply(lambda row: get_fuzzy_status_combined(row, weekly_fuzzy_system, 'weekly'), axis=1)
+    df['monthly_overall_status'] = df.apply(lambda row: get_fuzzy_status_combined(row, monthly_fuzzy_system, 'monthly'), axis=1)
+
+    # Combine the results to get the final overall status
+    df['overall_status'] = df[['daily_overall_status', 'weekly_overall_status', 'monthly_overall_status']].mean(axis=1)
+
+    # Classify the overall status
+    df['overall_status_class'] = df['overall_status'].apply(classify_overall_status)
 
     return df
 
-def get_fuzzy_status(value, status_sim):
-    status_sim.input['sensor_value'] = value
-    status_sim.compute()
-    return status_sim.output['status']
+
+def get_fuzzy_status_combined(row, fuzzy_system, interval):
+    try:
+        fuzzy_system.input['temperature_mean'] = row[f'temperature_{interval}_mean']
+        fuzzy_system.input['humidity_mean'] = row[f'humidity_{interval}_mean']
+        fuzzy_system.input['lightIntensity_mean'] = row[f'lightIntensity_{interval}_mean']
+        fuzzy_system.input['soilMoisture_mean'] = row[f'soilMoisture_{interval}_mean']
+        fuzzy_system.compute()
+        print(f"Fuzzy system output for {interval}: {fuzzy_system.output['overall_status']}")
+        return fuzzy_system.output['overall_status']
+    except KeyError as e:
+        print(f"KeyError: {e}")
+        print(f"Row: {row}")
+        raise
 
 
 def main():
@@ -292,18 +327,20 @@ def main():
         df = ma_analysis(df, column, 30, 'monthly', is_append=is_append)
         df = get_sensor_value_status(df, column)
 
-    # # Apply fuzzy logic for overall status
-    # df = fuzzy_logic_overall_status(df)
+    # Apply fuzzy logic for overall status
+    df = fuzzy_logic_overall_status(df)
     
     # Filter and rearrange the column order
     df = reorder_and_filter_columns(df)
-        
+    
+    print(df['overall_status'])
+
     with open("combined.txt", 'w') as f:
         f.write(df.to_string())
 
     save_analysis(df, is_append=is_append)
 
-    # NEXT IS PLOT THE CHANGES IN STATS GRAPH
+    # CREATE A SEPARATE FILE TO TEST YOUR FUZZY LOGIC TO MOCK DATA OF (DAILY ONLY)
     # FIND RELIABLE DATA FOR BAD, GOOD, HEALTHY DATA
 
 # MAIN FUNCTION
