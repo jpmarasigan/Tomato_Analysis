@@ -237,7 +237,7 @@ def get_sensor_value_status(df, column):
 
 
 def classify_overall_status(value):
-    if value >= 60:
+    if value >= 50:
         return 'good'
     else:
         return 'bad'
@@ -246,25 +246,42 @@ def classify_overall_status(value):
 def fuzzy_logic_overall_status(df):
     def create_fuzzy_system():
         # Define fuzzy variables
-        temperature_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'temperature_mean')
+        # https://bagong.pagasa.dost.gov.ph/information/climate-philippines
+        # Temperature 0-50
+        temperature_mean = ctrl.Antecedent(np.arange(0, 51, 1), 'temperature_mean')
+        # Humidity 0-100
         humidity_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'humidity_mean')
-        lightIntensity_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'lightIntensity_mean')
+        # Light Intensity 0-65536
+        lightIntensity_mean = ctrl.Antecedent(np.arange(0, 65536, 1), 'lightIntensity_mean')
+        # Soil Moisture 0-100
         soilMoisture_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'soilMoisture_mean')
+        # Overall if 100 perfectly healthy
         overall_status = ctrl.Consequent(np.arange(0, 101, 1), 'overall_status')
 
         # Define fuzzy membership functions
-        for mean in [temperature_mean, humidity_mean, lightIntensity_mean, soilMoisture_mean]:
-            mean['low'] = fuzz.trimf(mean.universe, [0, 0, 50])
-            mean['medium'] = fuzz.trimf(mean.universe, [0, 50, 100])
-            mean['high'] = fuzz.trimf(mean.universe, [50, 100, 100])
+        temperature_mean['low'] = fuzz.trimf(temperature_mean.universe, [0, 0, 20])
+        temperature_mean['ideal'] = fuzz.trimf(temperature_mean.universe, [18, 21, 25])
+        temperature_mean['high'] = fuzz.trimf(temperature_mean.universe, [23, 50, 50])
+
+        humidity_mean['low'] = fuzz.trimf(humidity_mean.universe, [0, 0, 30])
+        humidity_mean['ideal'] = fuzz.trimf(humidity_mean.universe, [30, 45, 60])
+        humidity_mean['high'] = fuzz.trimf(humidity_mean.universe, [60, 100, 100])
+
+        lightIntensity_mean['low'] = fuzz.trimf(lightIntensity_mean.universe, [0, 0, 20000])
+        lightIntensity_mean['ideal'] = fuzz.trimf(lightIntensity_mean.universe, [20000, 35000, 60000])
+        lightIntensity_mean['high'] = fuzz.trimf(lightIntensity_mean.universe, [50000, 65536, 65536])
+
+        soilMoisture_mean['low'] = fuzz.trimf(soilMoisture_mean.universe, [0, 0, 30])  
+        soilMoisture_mean['ideal'] = fuzz.trimf(soilMoisture_mean.universe, [40, 60, 80])  
+        soilMoisture_mean['high'] = fuzz.trimf(soilMoisture_mean.universe, [70, 100, 100])  
 
         overall_status['unhealthy'] = fuzz.trimf(overall_status.universe, [0, 0, 50])
         overall_status['healthy'] = fuzz.trimf(overall_status.universe, [50, 100, 100])
 
-        # Define fuzzy rules
+        # Define fuzzy rules (TENTATIVE VALUES)
         rule1 = ctrl.Rule(temperature_mean['low'] | humidity_mean['low'] | lightIntensity_mean['low'] | soilMoisture_mean['low'], overall_status['unhealthy'])
-        rule2 = ctrl.Rule(temperature_mean['medium'] & humidity_mean['medium'] & lightIntensity_mean['medium'] & soilMoisture_mean['medium'], overall_status['healthy'])
-        rule3 = ctrl.Rule(temperature_mean['high'] & humidity_mean['high'] & lightIntensity_mean['high'] & soilMoisture_mean['high'], overall_status['healthy'])
+        rule2 = ctrl.Rule(temperature_mean['ideal'] & humidity_mean['ideal'] & lightIntensity_mean['ideal'] & soilMoisture_mean['ideal'], overall_status['healthy'])
+        rule3 = ctrl.Rule(temperature_mean['high'] & humidity_mean['high'] & lightIntensity_mean['high'] & soilMoisture_mean['high'], overall_status['unhealthy'])
 
         # Create control system
         overall_status_ctrl = ctrl.ControlSystem([rule1, rule2, rule3])
@@ -333,7 +350,9 @@ def main():
     # Filter and rearrange the column order
     df = reorder_and_filter_columns(df)
     
-    print(df['overall_status'])
+    # Debugging: Print the processed data
+    print("Processed data:")
+    print(df)
 
     with open("combined.txt", 'w') as f:
         f.write(df.to_string())
