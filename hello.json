@@ -1,0 +1,22 @@
+[
+    {
+        "hardware_id": {
+            "2024-12-26": {
+                "humidity": -1,
+                "lightIntensity": 30,
+                "soilMoisture1": 22,
+                "soilMoisture2": 25,
+                "soilMoisture3": 50,
+                "temperature": 3
+            },
+            "2024-12-27": {
+                "humidity": -1,
+                "lightIntensity": 30,
+                "soilMoisture1": 22,
+                "soilMoisture2": 25,
+                "soilMoisture3": 50,
+                "temperature": 3
+            }
+        }
+    }
+]

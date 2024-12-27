@@ -1,0 +1,66 @@
+[
+    {
+        "hardware1000": {
+            "cropData": {}
+        }
+    },
+    {
+        "hardware1205": {}
+    },
+    {
+        "hardware120502": {
+            "2024-12-26": {
+                "humidity": 21,
+                "soilMoisture2": 91,
+                "temperature": -1.0,
+                "soilMoisture1": 105,
+                "soilMoisture3": 89.0,
+                "lightIntensity": 0.0
+            },
+            "2024-12-27": {
+                "humidity": -1.0,
+                "lightIntensity": 0.0,
+                "temperature": -1.0,
+                "soilMoisture1": 92.0,
+                "soilMoisture2": 100.0,
+                "soilMoisture3": 92.0
+            }
+        }
+    },
+    {
+        "hardware120503": {
+            "2024-12-28": {
+                "humidity": 20,
+                "createdAt": "2024-12-27T17:41:31.676000+00:00",
+                "temperature": 10,
+                "soilMoisture1": 40,
+                "lightIntensity": 30
+            }
+        }
+    },
+    {
+        "hardware2000": {
+            "cropData": {}
+        }
+    },
+    {
+        "hardware2028": {
+            "2024-12-26": {
+                "humidity": 82.4,
+                "lightIntensity": 80.0,
+                "temperature": 29.0,
+                "soilMoisture1": 5.0,
+                "soilMoisture2": 0.0,
+                "soilMoisture3": 1.0
+            },
+            "2024-12-27": {
+                "humidity": 82.2,
+                "lightIntensity": 84.0,
+                "temperature": 29.1,
+                "soilMoisture1": 4.0,
+                "soilMoisture2": 0.0,
+                "soilMoisture3": 1.0
+            }
+        }
+    }
+]
