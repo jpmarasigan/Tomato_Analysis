@@ -173,9 +173,11 @@ def ma_analysis(df, column, window_size, interval, is_append):
 def reorder_and_filter_columns(df):
     columns_to_remove = [
         'humidity',
-        'soilMoisture',
         'lightIntensity',      
-        'temperature'
+        'temperature',
+        'soilMoisture1',
+        'soilMoisture2',
+        'soilMoisture3'
     ]
 
     preferred_column_order = [
@@ -188,9 +190,15 @@ def reorder_and_filter_columns(df):
         'lightIntensity_monthly_mean', 'lightIntensity_monthly_rate_change', 'lightIntensity_monthly_std',
         'lightIntensity_weekly_mean', 'lightIntensity_weekly_rate_change', 'lightIntensity_weekly_std',
         # Soil Moisture 
-        'soilMoisture_daily_mean', 'soilMoisture_daily_rate_change', 
-        'soilMoisture_monthly_mean', 'soilMoisture_monthly_rate_change', 'soilMoisture_monthly_std',
-        'soilMoisture_weekly_mean', 'soilMoisture_weekly_rate_change', 'soilMoisture_weekly_std', 
+        'soilMoisture1_daily_mean', 'soilMoisture1_daily_rate_change', 
+        'soilMoisture1_monthly_mean', 'soilMoisture1_monthly_rate_change', 'soilMoisture1_monthly_std',
+        'soilMoisture1_weekly_mean', 'soilMoisture1_weekly_rate_change', 'soilMoisture1_weekly_std', 
+        'soilMoisture2_daily_mean', 'soilMoisture2_daily_rate_change', 
+        'soilMoisture2_monthly_mean', 'soilMoisture2_monthly_rate_change', 'soilMoisture2_monthly_std',
+        'soilMoisture2_weekly_mean', 'soilMoisture2_weekly_rate_change', 'soilMoisture2_weekly_std', 
+        'soilMoisture3_daily_mean', 'soilMoisture3_daily_rate_change', 
+        'soilMoisture3_monthly_mean', 'soilMoisture3_monthly_rate_change', 'soilMoisture3_monthly_std',
+        'soilMoisture3_weekly_mean', 'soilMoisture3_weekly_rate_change', 'soilMoisture3_weekly_std', 
         # Temperature 
         'temperature_daily_mean', 'temperature_daily_rate_change',
         'temperature_monthly_mean', 'temperature_monthly_rate_change', 'temperature_monthly_std',
@@ -198,7 +206,9 @@ def reorder_and_filter_columns(df):
         # Statuses
         'humidity_daily_status', 'humidity_weekly_status', 'humidity_monthly_status',
         'lightIntensity_daily_status', 'lightIntensity_weekly_status', 'lightIntensity_monthly_status',
-        'soilMoisture_daily_status', 'soilMoisture_weekly_status', 'soilMoisture_monthly_status',
+        'soilMoisture1_daily_status', 'soilMoisture1_weekly_status', 'soilMoisture1_monthly_status',
+        'soilMoisture2_daily_status', 'soilMoisture2_weekly_status', 'soilMoisture2_monthly_status',
+        'soilMoisture3_daily_status', 'soilMoisture3_weekly_status', 'soilMoisture3_monthly_status',
         'temperature_daily_status', 'temperature_weekly_status', 'temperature_monthly_status',
         'daily_overall_status', 'weekly_overall_status', 'monthly_overall_status', 'overall_status'  
     ]
@@ -210,17 +220,31 @@ def reorder_and_filter_columns(df):
     return df
 
 
-def save_analysis(latest_df, is_append):
+def save_analysis(latest_df, hardware_id, is_append):
+    print(hardware_id)
+
     # Save to firestore database
     for _, row in latest_df.iterrows():
         try:
             if is_append:   # Skip the last date to avoid NaN values in rate of change
                 is_append = False
                 continue
-            doc_ref = db.collection("Analysis").document(row['date'])
-            # drop date value
-            row_data_without_date = row.drop(labels='date')
-            doc_ref.set(row_data_without_date.to_dict(), merge=True)
+            # Get date document which is the unique key for date
+            date_collection_ref = db.collection("Analysis2").document(str(hardware_id)).collection(row['date'])
+            date_docs = date_collection_ref.stream()
+
+            # Create date document for fields if there is no at least one exist
+            if not any(date_docs):
+                date_collection_ref.document("date_document_id").set({})
+
+            date_docs = date_collection_ref.stream()
+            
+            for date_doc in date_docs:
+                doc_ref = db.collection("Analysis2").document(str(hardware_id)).collection(row['date']).document(date_doc.id)
+            
+                # drop date value
+                row_data_without_date = row.drop(labels='date')
+                doc_ref.set(row_data_without_date.to_dict(), merge=True)
         except Exception as e:
             print(f"An error occured: {e}")
         
@@ -286,8 +310,10 @@ def fuzzy_logic_overall_status(df):
         humidity_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'humidity_mean')
         # Light Intensity 0-65536
         lightIntensity_mean = ctrl.Antecedent(np.arange(0, 65536, 1), 'lightIntensity_mean')
-        # Soil Moisture 0-100
-        soilMoisture_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'soilMoisture_mean')
+        # Soil Moisture 1,2,3 0-100
+        soilMoisture1_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'soilMoisture1_mean')
+        soilMoisture2_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'soilMoisture2_mean')
+        soilMoisture3_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'soilMoisture3_mean')
         # Overall if 100 perfectly healthy
         overall_status = ctrl.Consequent(np.arange(0, 101, 1), 'overall_status')
 
@@ -304,17 +330,37 @@ def fuzzy_logic_overall_status(df):
         lightIntensity_mean['ideal'] = fuzz.trimf(lightIntensity_mean.universe, [20000, 35000, 60000])
         lightIntensity_mean['high'] = fuzz.trimf(lightIntensity_mean.universe, [50000, 65536, 65536])
 
-        soilMoisture_mean['low'] = fuzz.trimf(soilMoisture_mean.universe, [0, 0, 30])  
-        soilMoisture_mean['ideal'] = fuzz.trimf(soilMoisture_mean.universe, [40, 60, 80])  
-        soilMoisture_mean['high'] = fuzz.trimf(soilMoisture_mean.universe, [70, 100, 100])  
+        soilMoisture1_mean['low'] = fuzz.trimf(soilMoisture1_mean.universe, [0, 0, 30])  
+        soilMoisture1_mean['ideal'] = fuzz.trimf(soilMoisture1_mean.universe, [40, 60, 80])  
+        soilMoisture1_mean['high'] = fuzz.trimf(soilMoisture1_mean.universe, [70, 100, 100])  
+
+        soilMoisture2_mean['low'] = fuzz.trimf(soilMoisture2_mean.universe, [0, 0, 30])  
+        soilMoisture2_mean['ideal'] = fuzz.trimf(soilMoisture2_mean.universe, [40, 60, 80])  
+        soilMoisture2_mean['high'] = fuzz.trimf(soilMoisture2_mean.universe, [70, 100, 100])  
+
+        soilMoisture3_mean['low'] = fuzz.trimf(soilMoisture3_mean.universe, [0, 0, 30])  
+        soilMoisture3_mean['ideal'] = fuzz.trimf(soilMoisture3_mean.universe, [40, 60, 80])  
+        soilMoisture3_mean['high'] = fuzz.trimf(soilMoisture3_mean.universe, [70, 100, 100])  
 
         overall_status['unhealthy'] = fuzz.trimf(overall_status.universe, [0, 0, 50])
         overall_status['healthy'] = fuzz.trimf(overall_status.universe, [50, 100, 100])
 
         # Define fuzzy rules (TENTATIVE VALUES)
-        rule1 = ctrl.Rule(temperature_mean['low'] | humidity_mean['low'] | lightIntensity_mean['low'] | soilMoisture_mean['low'], overall_status['unhealthy'])
-        rule2 = ctrl.Rule(temperature_mean['ideal'] & humidity_mean['ideal'] & lightIntensity_mean['ideal'] & soilMoisture_mean['ideal'], overall_status['healthy'])
-        rule3 = ctrl.Rule(temperature_mean['high'] & humidity_mean['high'] & lightIntensity_mean['high'] & soilMoisture_mean['high'], overall_status['unhealthy'])
+        rule1 = ctrl.Rule(
+            temperature_mean['low'] | humidity_mean['low'] | lightIntensity_mean['low'] | 
+            soilMoisture1_mean['low'] | soilMoisture2_mean['low'] | soilMoisture3_mean['low'], 
+            overall_status['unhealthy']
+        )
+        rule2 = ctrl.Rule(
+            temperature_mean['ideal'] & humidity_mean['ideal'] & lightIntensity_mean['ideal'] & 
+            soilMoisture1_mean['ideal'] & soilMoisture2_mean['ideal'] & soilMoisture3_mean['ideal'], 
+            overall_status['healthy']
+        )
+        rule3 = ctrl.Rule(
+            temperature_mean['high'] & humidity_mean['high'] & lightIntensity_mean['high'] & 
+            soilMoisture1_mean['high'] & soilMoisture2_mean['high'] & soilMoisture3_mean['high'], 
+            overall_status['unhealthy']
+        )
 
         # Create control system
         overall_status_ctrl = ctrl.ControlSystem([rule1, rule2, rule3])
@@ -344,7 +390,9 @@ def get_fuzzy_status_combined(row, fuzzy_system, interval):
         fuzzy_system.input['temperature_mean'] = row[f'temperature_{interval}_mean']
         fuzzy_system.input['humidity_mean'] = row[f'humidity_{interval}_mean']
         fuzzy_system.input['lightIntensity_mean'] = row[f'lightIntensity_{interval}_mean']
-        fuzzy_system.input['soilMoisture_mean'] = row[f'soilMoisture_{interval}_mean']
+        fuzzy_system.input['soilMoisture1_mean'] = row[f'soilMoisture1_{interval}_mean']
+        fuzzy_system.input['soilMoisture2_mean'] = row[f'soilMoisture2_{interval}_mean']
+        fuzzy_system.input['soilMoisture3_mean'] = row[f'soilMoisture3_{interval}_mean']
         fuzzy_system.compute()
         print(f"Fuzzy system output for {interval}: {fuzzy_system.output['overall_status']}")
         return fuzzy_system.output['overall_status']
@@ -395,24 +443,17 @@ def main():
 
             print(df)
 
+            # Apply fuzzy logic for overall status
+            df = fuzzy_logic_overall_status(df)
+            
+            # Filter and rearrange the column order
+            df = reorder_and_filter_columns(df)
+
             # Write to CSV file
             with open(f"output{i}.txt", 'w') as f:
                 f.write(df.to_string())
 
-            # # Apply fuzzy logic for overall status
-            # df = fuzzy_logic_overall_status(df)
-            
-            # # Filter and rearrange the column order
-            # df = reorder_and_filter_columns(df)
-            
-            # # Debugging: Print the processed data
-            # print("Processed data:")
-            # print(df)
-
-            # with open("combined.txt", 'w') as f:
-            #     f.write(df.to_string())
-
-            # save_analysis(df, is_append=is_append)
+            save_analysis(df, hardware_id=hardware_id, is_append=is_append)
 
     # CREATE A SEPARATE FILE TO TEST YOUR FUZZY LOGIC TO MOCK DATA OF (DAILY ONLY)
     # FIND RELIABLE DATA FOR BAD, GOOD, HEALTHY DATA

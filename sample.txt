@@ -24,6 +24,15 @@
                 "soilMoisture1": 92.0,
                 "soilMoisture2": 100.0,
                 "soilMoisture3": 92.0
+            },
+            "2024-12-28": {
+                "humidity": -1.0,
+                "soilMoisture2": 76.0,
+                "soilMoisture3": 70.0,
+                "createdAt": "2024-12-28 02:28",
+                "lightIntensity": 22.0,
+                "soilMoisture1": 65.0,
+                "temperature": -1.0
             }
         }
     },
@@ -32,6 +41,17 @@
             "2024-12-28": {
                 "humidity": 20,
                 "createdAt": "2024-12-27T17:41:31.676000+00:00",
+                "temperature": 10,
+                "soilMoisture1": 40,
+                "lightIntensity": 30
+            }
+        }
+    },
+    {
+        "hardware120504": {
+            "2024-12-28": {
+                "humidity": 20,
+                "createdAt": "2024-12-27T18:19:43.791000+00:00",
                 "temperature": 10,
                 "soilMoisture1": 40,
                 "lightIntensity": 30
