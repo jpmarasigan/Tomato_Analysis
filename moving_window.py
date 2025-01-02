@@ -91,11 +91,16 @@ def ma_analysis(df, column, window_size, interval, is_append):
     global last_fetched_date
 
     # Ensure the column is numeric
+    if column not in df.columns:
+        print(f"Column {column} does not exist in the DataFrame.")
+        return df
+    
+    # Ensure the column is numeric
     df[column] = pd.to_numeric(df[column], errors='coerce')
 
     if window_size == 1:
         df[f'{column}_{interval}_mean'] = df[column].rolling(window=1).mean()
-        df[f'{column}_{interval}_rate_change'] = df[column].pct_change(periods=1)
+        df[f'{column}_{interval}_rate_change'] = df[column].pct_change(periods=1, fill_method=None)
         df[f'{column}_{interval}_rate_change'] = df.apply(
             lambda row: 0 if row[column] == 0 and pd.isna(row[f'{column}_{interval}_rate_change']) else row[f'{column}_{interval}_rate_change'],
             axis=1
@@ -105,7 +110,7 @@ def ma_analysis(df, column, window_size, interval, is_append):
     if not is_append and not last_fetched_date:
         df[f'{column}_{interval}_mean'] = df[column].rolling(window=window_size).mean()
         df[f'{column}_{interval}_std'] = df[column].rolling(window=window_size).std()
-        df[f'{column}_{interval}_rate_change'] = df[column].pct_change(periods=window_size)
+        df[f'{column}_{interval}_rate_change'] = df[column].pct_change(periods=window_size, fill_method=None)
         df[f'{column}_{interval}_rate_change'] = df.apply(
             lambda row: 0 if row[column] == 0 and pd.isna(row[f'{column}_{interval}_rate_change']) else row[f'{column}_{interval}_rate_change'],
             axis=1
@@ -131,7 +136,7 @@ def ma_analysis(df, column, window_size, interval, is_append):
 
             append_df[f'{column}_{interval}_mean'] = append_df[column].rolling(window=window_size).mean()
             append_df[f'{column}_{interval}_std'] = append_df[column].rolling(window=window_size).std()
-            append_df[f'{column}_{interval}_rate_change'] = append_df[column].pct_change(periods=window_size)
+            append_df[f'{column}_{interval}_rate_change'] = append_df[column].pct_change(periods=window_size, fill_method=None)
             append_df[f'{column}_{interval}_rate_change'] = append_df.apply(
                 lambda row: 0 if row[column] == 0 and pd.isna(row[f'{column}_{interval}_rate_change']) else row[f'{column}_{interval}_rate_change'],
                 axis=1
@@ -229,6 +234,11 @@ def save_analysis(latest_df, hardware_id, is_append):
             if is_append:   # Skip the last date to avoid NaN values in rate of change
                 is_append = False
                 continue
+
+            parent_doc_ref = db.collection("Analysis2").document(str(hardware_id))
+            if not parent_doc_ref.get().exists:
+                parent_doc_ref.set({"initialized": True})
+
             # Get date document which is the unique key for date
             date_collection_ref = db.collection("Analysis2").document(str(hardware_id)).collection(row['date'])
             date_docs = date_collection_ref.stream()
@@ -241,7 +251,10 @@ def save_analysis(latest_df, hardware_id, is_append):
             
             for date_doc in date_docs:
                 doc_ref = db.collection("Analysis2").document(str(hardware_id)).collection(row['date']).document(date_doc.id)
-            
+
+                if not doc_ref.get().exists:
+                    doc_ref.set({"initialized": True})  # Create the document with a placeholder field
+
                 # drop date value
                 row_data_without_date = row.drop(labels='date')
                 doc_ref.set(row_data_without_date.to_dict(), merge=True)
@@ -411,50 +424,51 @@ def main():
     
     for i, hardware in enumerate(hardwares):
         for hardware_id, hardware_data in hardware.items():
-            if hardware_id != 'hardware120502':
+            if hardware_id == 'hardware120502' or hardware_id == 'hardware120503':
+                # Flatten the nested dictionary
+                flattened_data = []
+                for date, sensors_data in hardware_data.items():
+                    all_data = {}
+                    all_data['date'] = str(date)
+                    for sensor, data in sensors_data.items():
+                        all_data[sensor] = data
+                    flattened_data.append(all_data)
+
+                # print(json.dumps(flattened_data, indent=4))
+
+                # Create a DataFrame from the flattened data
+                df = pd.DataFrame(flattened_data)
+
+                # Reorder columns to have 'date' first
+                df = df[['date'] + [col for col in df.columns if col != 'date']]          
+                
+                # Convert relevant columns to numeric
+                for column in ['temperature', 'humidity', 'lightIntensity', 'soilMoisture1', 'soilMoisture2', 'soilMoisture3']:
+                    df[column] = pd.to_numeric(df[column], errors='coerce')
+                
+                # Get MA of sensors output for daily, weekly, monthly
+                for column in ['temperature', 'humidity', 'lightIntensity', 'soilMoisture1', 'soilMoisture2', 'soilMoisture3']:
+                    df = ma_analysis(df, column, 1, 'daily', is_append=is_append)
+                    df = ma_analysis(df, column, 7, 'weekly', is_append=is_append)
+                    df = ma_analysis(df, column, 30, 'monthly', is_append=is_append)
+                    df = get_sensor_value_status(df, column)
+
+                print(df)
+
+                # Apply fuzzy logic for overall status
+                df = fuzzy_logic_overall_status(df)
+                
+                # Filter and rearrange the column order
+                df = reorder_and_filter_columns(df)
+
+                # Write to CSV file
+                with open(f"output{i}.txt", 'w') as f:
+                    f.write(df.to_string())
+
+                save_analysis(df, hardware_id=hardware_id, is_append=is_append)
+            else:
+                print("Hardware ID: ", hardware_id)
                 continue
-            # Flatten the nested dictionary
-            flattened_data = []
-            for date, sensors_data in hardware_data.items():
-                all_data = {}
-                all_data['date'] = str(date)
-                for sensor, data in sensors_data.items():
-                    all_data[sensor] = data
-                flattened_data.append(all_data)
-
-            # print(json.dumps(flattened_data, indent=4))
-
-            # Create a DataFrame from the flattened data
-            df = pd.DataFrame(flattened_data)
-
-            # Reorder columns to have 'date' first
-            df = df[['date'] + [col for col in df.columns if col != 'date']]          
-            
-            # Convert relevant columns to numeric
-            for column in ['temperature', 'humidity', 'lightIntensity', 'soilMoisture1', 'soilMoisture2', 'soilMoisture3']:
-                df[column] = pd.to_numeric(df[column], errors='coerce')
-            
-            # Get MA of sensors output for daily, weekly, monthly
-            for column in ['temperature', 'humidity', 'lightIntensity', 'soilMoisture1', 'soilMoisture2', 'soilMoisture3']:
-                df = ma_analysis(df, column, 1, 'daily', is_append=is_append)
-                df = ma_analysis(df, column, 7, 'weekly', is_append=is_append)
-                df = ma_analysis(df, column, 30, 'monthly', is_append=is_append)
-                df = get_sensor_value_status(df, column)
-
-            print(df)
-
-            # Apply fuzzy logic for overall status
-            df = fuzzy_logic_overall_status(df)
-            
-            # Filter and rearrange the column order
-            df = reorder_and_filter_columns(df)
-
-            # Write to CSV file
-            with open(f"output{i}.txt", 'w') as f:
-                f.write(df.to_string())
-
-            save_analysis(df, hardware_id=hardware_id, is_append=is_append)
-
     # CREATE A SEPARATE FILE TO TEST YOUR FUZZY LOGIC TO MOCK DATA OF (DAILY ONLY)
     # FIND RELIABLE DATA FOR BAD, GOOD, HEALTHY DATA
 

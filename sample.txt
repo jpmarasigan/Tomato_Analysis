@@ -1,5 +1,18 @@
 [
     {
+        "hardware010125": {
+            "2025-01-01": {
+                "humidity": 3.2,
+                "soilMoisture2": 69.0,
+                "soilMoisture3": 67.0,
+                "createdAt": "2025-01-01 23:20",
+                "lightIntensity": 70.0,
+                "soilMoisture1": 68.0,
+                "temperature": 2.4
+            }
+        }
+    },
+    {
         "hardware1000": {
             "cropData": {}
         }
@@ -11,15 +24,15 @@
         "hardware120502": {
             "2024-12-26": {
                 "humidity": 21,
-                "soilMoisture2": 91,
+                "lightIntensity": 55,
                 "temperature": -1.0,
                 "soilMoisture1": 105,
                 "soilMoisture3": 89.0,
-                "lightIntensity": 0.0
+                "soilMoisture2": 91
             },
             "2024-12-27": {
                 "humidity": -1.0,
-                "lightIntensity": 0.0,
+                "lightIntensity": 88,
                 "temperature": -1.0,
                 "soilMoisture1": 92.0,
                 "soilMoisture2": 100.0,
@@ -33,6 +46,255 @@
                 "lightIntensity": 22.0,
                 "soilMoisture1": 65.0,
                 "temperature": -1.0
+            },
+            "2024-12-31": {
+                "humidity": 78.0,
+                "soilMoisture2": 49.0,
+                "soilMoisture3": 38.0,
+                "createdAt": "2024-12-31 01:26",
+                "lightIntensity": 46.0,
+                "soilMoisture1": 47.0,
+                "temperature": 30.0
+            },
+            "2025-01-01": {
+                "humidity": 17,
+                "temperature": 35,
+                "lightIntensity": 95,
+                "soilMoisture1": 36,
+                "soilMoisture3": 68,
+                "soilMoisture2": 34
+            },
+            "2025-01-02": {
+                "humidity": 53,
+                "temperature": 43,
+                "lightIntensity": 9,
+                "soilMoisture1": 26,
+                "soilMoisture3": 53,
+                "soilMoisture2": 66
+            },
+            "2025-01-03": {
+                "humidity": 21,
+                "temperature": 25,
+                "lightIntensity": 12,
+                "soilMoisture1": 36,
+                "soilMoisture3": 49,
+                "soilMoisture2": 65
+            },
+            "2025-01-04": {
+                "humidity": 62,
+                "temperature": 42,
+                "lightIntensity": 90,
+                "soilMoisture1": 10,
+                "soilMoisture3": 23,
+                "soilMoisture2": 40
+            },
+            "2025-01-05": {
+                "humidity": 70,
+                "temperature": 20,
+                "lightIntensity": 34,
+                "soilMoisture1": 21,
+                "soilMoisture3": 24,
+                "soilMoisture2": 27
+            },
+            "2025-01-06": {
+                "humidity": 59,
+                "temperature": 0,
+                "lightIntensity": 13,
+                "soilMoisture1": 69,
+                "soilMoisture3": 69,
+                "soilMoisture2": 19
+            },
+            "2025-01-07": {
+                "humidity": 7,
+                "temperature": 65,
+                "lightIntensity": 0,
+                "soilMoisture1": 12,
+                "soilMoisture3": 42,
+                "soilMoisture2": 66
+            },
+            "2025-01-08": {
+                "humidity": 46,
+                "temperature": 50,
+                "lightIntensity": 87,
+                "soilMoisture1": 13,
+                "soilMoisture3": 16,
+                "soilMoisture2": 21
+            },
+            "2025-01-09": {
+                "humidity": 54,
+                "temperature": 1,
+                "lightIntensity": 86,
+                "soilMoisture1": 28,
+                "soilMoisture3": 60,
+                "soilMoisture2": 36
+            },
+            "2025-01-10": {
+                "humidity": 41,
+                "temperature": 8,
+                "lightIntensity": 67,
+                "soilMoisture1": 10,
+                "soilMoisture3": 59,
+                "soilMoisture2": 31
+            },
+            "2025-01-11": {
+                "humidity": 16,
+                "temperature": 31,
+                "lightIntensity": 98,
+                "soilMoisture1": 27,
+                "soilMoisture3": 59,
+                "soilMoisture2": 7
+            },
+            "2025-01-12": {
+                "humidity": 12,
+                "temperature": 64,
+                "lightIntensity": 30,
+                "soilMoisture1": 26,
+                "soilMoisture3": 22,
+                "soilMoisture2": 59
+            },
+            "2025-01-13": {
+                "humidity": 47,
+                "temperature": 47,
+                "lightIntensity": 17,
+                "soilMoisture1": 54,
+                "soilMoisture3": 1,
+                "soilMoisture2": 60
+            },
+            "2025-01-14": {
+                "humidity": 45,
+                "temperature": 40,
+                "lightIntensity": 29,
+                "soilMoisture1": 69,
+                "soilMoisture3": 57,
+                "soilMoisture2": 15
+            },
+            "2025-01-15": {
+                "humidity": 63,
+                "temperature": 42,
+                "lightIntensity": 87,
+                "soilMoisture1": 7,
+                "soilMoisture3": 33,
+                "soilMoisture2": 4
+            },
+            "2025-01-16": {
+                "humidity": 52,
+                "temperature": 11,
+                "lightIntensity": 81,
+                "soilMoisture1": 3,
+                "soilMoisture3": 3,
+                "soilMoisture2": 46
+            },
+            "2025-01-17": {
+                "humidity": 37,
+                "temperature": 57,
+                "lightIntensity": 52,
+                "soilMoisture1": 60,
+                "soilMoisture3": 5,
+                "soilMoisture2": 33
+            },
+            "2025-01-18": {
+                "humidity": 26,
+                "temperature": 6,
+                "lightIntensity": 44,
+                "soilMoisture1": 7,
+                "soilMoisture3": 14,
+                "soilMoisture2": 62
+            },
+            "2025-01-19": {
+                "humidity": 35,
+                "temperature": 16,
+                "lightIntensity": 83,
+                "soilMoisture1": 31,
+                "soilMoisture3": 12,
+                "soilMoisture2": 49
+            },
+            "2025-01-20": {
+                "humidity": 52,
+                "temperature": 63,
+                "lightIntensity": 25,
+                "soilMoisture1": 2,
+                "soilMoisture3": 58,
+                "soilMoisture2": 21
+            },
+            "2025-01-21": {
+                "humidity": 26,
+                "temperature": 61,
+                "lightIntensity": 25,
+                "soilMoisture1": 9,
+                "soilMoisture3": 34,
+                "soilMoisture2": 51
+            },
+            "2025-01-22": {
+                "humidity": 54,
+                "temperature": 37,
+                "lightIntensity": 55,
+                "soilMoisture1": 68,
+                "soilMoisture3": 62,
+                "soilMoisture2": 45
+            },
+            "2025-01-23": {
+                "humidity": 7,
+                "temperature": 13,
+                "lightIntensity": 18,
+                "soilMoisture1": 56,
+                "soilMoisture3": 37,
+                "soilMoisture2": 24
+            },
+            "2025-01-24": {
+                "humidity": 57,
+                "temperature": 52,
+                "lightIntensity": 15,
+                "soilMoisture1": 31,
+                "soilMoisture3": 62,
+                "soilMoisture2": 48
+            },
+            "2025-01-25": {
+                "humidity": 48,
+                "temperature": 66,
+                "lightIntensity": 14,
+                "soilMoisture1": 39,
+                "soilMoisture3": 5,
+                "soilMoisture2": 4
+            },
+            "2025-01-26": {
+                "humidity": 54,
+                "temperature": 11,
+                "lightIntensity": 18,
+                "soilMoisture1": 51,
+                "soilMoisture3": 63,
+                "soilMoisture2": 54
+            },
+            "2025-01-27": {
+                "humidity": 68,
+                "temperature": 5,
+                "lightIntensity": 35,
+                "soilMoisture1": 34,
+                "soilMoisture3": 36,
+                "soilMoisture2": 12
+            },
+            "2025-01-28": {
+                "humidity": 26,
+                "temperature": 0,
+                "lightIntensity": 23,
+                "soilMoisture1": 64,
+                "soilMoisture3": 20,
+                "soilMoisture2": 46
+            },
+            "2025-01-29": {
+                "humidity": 29,
+                "temperature": 70,
+                "lightIntensity": 83,
+                "soilMoisture1": 40,
+                "soilMoisture3": 5,
+                "soilMoisture2": 29
+            },
+            "2025-01-30": {
+                "humidity": 10,
+                "temperature": 56,
+                "lightIntensity": 42,
+                "soilMoisture1": 55,
+                "soilMoisture3": 21,
+                "soilMoisture2": 50
             }
         }
     },
@@ -40,9 +302,20 @@
         "hardware120503": {
             "2024-12-28": {
                 "humidity": 20,
+                "soilMoisture2": 42,
+                "soilMoisture3": 22,
                 "createdAt": "2024-12-27T17:41:31.676000+00:00",
                 "temperature": 10,
                 "soilMoisture1": 40,
+                "lightIntensity": 30
+            },
+            "2025-01-01": {
+                "humidity": 20,
+                "soilMoisture2": 95,
+                "soilMoisture3": 96,
+                "createdAt": "2025-01-01T09:34:54.224000+00:00",
+                "temperature": 10,
+                "soilMoisture1": 94,
                 "lightIntensity": 30
             }
         }
