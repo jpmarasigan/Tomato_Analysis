@@ -64,5 +64,5 @@ def del_collection_date(date):
             
 
 if __name__ == "__main__":
-    add_mock_data(num_of_iter=20)
-    # del_collection_date("2025-01-01")
+    # add_mock_data(num_of_iter=20)
+    del_collection_date("2025-01-02")
