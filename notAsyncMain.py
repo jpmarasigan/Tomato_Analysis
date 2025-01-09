@@ -235,30 +235,21 @@ def save_analysis(latest_df, hardware_id, is_append):
             if is_append:   # Skip the last date to avoid NaN values in rate of change
                 is_append = False
                 continue
-
+            
             parent_doc_ref = db.collection("Analysis2").document(str(hardware_id))
+            # If hardware id not exists, create one
             if not parent_doc_ref.get().exists:
                 parent_doc_ref.set({"initialized": True})
 
             # Get date document which is the unique key for date
-            date_collection_ref = db.collection("Analysis2").document(str(hardware_id)).collection(row['date'])
-            date_docs = date_collection_ref.stream()
+            date_collection_ref = db.collection("Analysis2").document(str(hardware_id)).collection("dates")
+            doc_ref = date_collection_ref.add({"initialized": True})
 
-            # Create date document for fields if there is no at least one exist
-            if not any(date_docs):
-                date_collection_ref.document("date_document_id").set({})
+            # drop date value
+            # row_data_without_date = row.drop(labels='date')
 
-            date_docs = date_collection_ref.stream()
-            
-            for date_doc in date_docs:
-                doc_ref = db.collection("Analysis2").document(str(hardware_id)).collection(row['date']).document(date_doc.id)
-
-                if not doc_ref.get().exists:
-                    doc_ref.set({"initialized": True})  # Create the document with a placeholder field
-
-                # drop date value
-                row_data_without_date = row.drop(labels='date')
-                doc_ref.set(row_data_without_date.to_dict(), merge=True)
+            # Create random document and its corresponding data field on the SECOND index
+            doc_ref[1].set(row.to_dict(), merge=True)
         except Exception as e:
             print(f"An error occured: {e}")
         
