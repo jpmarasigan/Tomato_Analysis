@@ -5,6 +5,7 @@ import datetime
 import numpy as np
 import skfuzzy as fuzz
 from skfuzzy import control as ctrl
+from collections import defaultdict
 import json
 import asyncio  # Import asyncio for asynchronous programming
 import time
@@ -15,6 +16,7 @@ firebase_admin.initialize_app(cred)
 db = firestore.client()          # Initialize Firestore client
 is_append = False
 last_fetched_date = None
+
 
 def get_last_fetched_timestamp():
     try:
@@ -34,55 +36,125 @@ def save_last_fetched_timestamp(timestamp):
 
 def fetch_data(collection_name):
     global is_append, last_fetched_date
+    
+    hardware_crop_dict = {}
 
     try:
-        now = datetime.date.today()
-        date_now_string = now.strftime("%Y-%m-%d")
-        last_fetched_date = get_last_fetched_timestamp()
-
-        # Compare first last fetched date and date today if there is new data
-        if last_fetched_date:
-            if last_fetched_date.strip() == date_now_string.strip():
-                print("No new data")
-                is_append = False
-                return
+        main_col_ref = db.collection("users")
+        user_doc_ref = main_col_ref.stream()
+        user_ids = [doc.id for doc in user_doc_ref]
         
-        collection_ref = db.collection(collection_name)
-        # Fetch hardware document (hardware id)
-        hardware_docs = collection_ref.stream()
-        
-        data_list = []  # Initialize an empty list to store data
+        for user_id in user_ids:
+            sub_collection = list(main_col_ref.document(user_id).collections())
 
-        for hardware_doc in hardware_docs:
-            hardware_sensor_data = {}
-            # Get dates under the given document hardware id   
-            date_colls = collection_ref.document(hardware_doc.id).collections()
-            for date_coll in date_colls:
-                date_docs = date_coll.stream()
+            if not sub_collection:
+                print(f"User {user_id} has no crops collections")
+                continue        # go to next user
+            
+            crop_col_ref = main_col_ref.document(user_id).collection("crops")
+            crop_doc_ref = crop_col_ref.stream()
 
-                # Sort date_docs by the document ID (which is assumed to be a date)
-                sorted_date_docs = sorted(date_docs, key=lambda doc: doc.id, reverse=True)
+            crop_ids = [crop.id for crop in crop_doc_ref]
+
+            # Get inside the crop info
+            for crop_id in crop_ids:
+                crop_doc_field = crop_col_ref.document(crop_id).get()
+
+                if crop_doc_field.exists:
+                    data = crop_doc_field.to_dict()
+                    hardware_crop_dict[data['hardwareID']] = data['cropType'].lower()
+
+        data_list = []
+        structured_hardware_data = {}
+
+        for hardware_id, crop_type in hardware_crop_dict.items():
+            hardware_col_ref = db.collection(hardware_id)
+            
+            # Check if hardware_id first exist
+            if not (hardware_col_ref.limit(1).get()):
+                print(f"Hardware {hardware_id} not exist")
+                continue
+
+            # Get all the dates of data in hardware_id collection (hardware120502 -> 2025-01-01-19:57, ...,)
+            hardware_dates = hardware_col_ref.stream()
+            
+            # Dictionary to store the latest time per date
+            date_dict = defaultdict(str)
+
+            for dates in hardware_dates:
+                # Convert string to datetime object
+                timestamp = datetime.datetime.strptime(dates.id, "%Y-%m-%d-%H:%M")
                 
-                if sorted_date_docs:
-                    last_date_doc = sorted_date_docs[0]
-                    data = last_date_doc.to_dict()
-                    # Convert DatetimeWithNanoseconds to string
-                    for key, value in data.items():
-                        # Converting DatetimeWithNanoseconds to a string
-                        if isinstance(value, datetime.datetime):
-                            data[key] = value.isoformat()
-                    hardware_sensor_data[date_coll.id] = data
+                # Extract the date part (YYYY-MM-DD)
+                date = timestamp.strftime("%Y-%m-%d")
+                
+                # Compare and store the latest time per date
+                if date_dict[date] == '' or timestamp > datetime.datetime.strptime(date_dict[date], "%Y-%m-%d-%H:%M"):
+                    date_dict[date] = dates.id
 
-            structured_data = {hardware_doc.id: hardware_sensor_data}
-            data_list.append(structured_data)
+            # Extract the latest times per date
+            date_list = list(date_dict.values())
 
-        if not data_list:
-            return None  
+            data = {}
+            for date in date_list:
+                doc_ref = hardware_col_ref.document(date).get()
+
+                # Store all data (values) per date (key)
+                if doc_ref.exists:
+                    sensor_data = doc_ref.to_dict()
+                    sensor_data["cropType"] = crop_type
+                    data[date] = sensor_data
+
+            structured_hardware_data[hardware_id] = data    
+        data_list.append(structured_hardware_data)
+
+        print(json.dumps(data_list, indent=4))
 
         with open("sample.txt", "w") as f:
             f.write(json.dumps(data_list, indent=4)) 
 
         return data_list
+
+
+
+            
+
+            
+        # Fetch hardware document (hardware id)
+        # hardware_docs = collection_ref.stream()
+        
+        # data_list = []  # Initialize an empty list to store data
+
+        # for hardware_doc in hardware_docs:
+        #     hardware_sensor_data = {}
+        #     # Get dates under the given document hardware id   
+        #     date_colls = collection_ref.document(hardware_doc.id).collections()
+        #     for date_coll in date_colls:
+        #         date_docs = date_coll.stream()
+
+        #         # Sort date_docs by the document ID (which is assumed to be a date)
+        #         sorted_date_docs = sorted(date_docs, key=lambda doc: doc.id, reverse=True)
+                
+        #         if sorted_date_docs:
+        #             last_date_doc = sorted_date_docs[0]
+        #             data = last_date_doc.to_dict()
+        #             # Convert DatetimeWithNanoseconds to string
+        #             for key, value in data.items():
+        #                 # Converting DatetimeWithNanoseconds to a string
+        #                 if isinstance(value, datetime.datetime):
+        #                     data[key] = value.isoformat()
+        #             hardware_sensor_data[date_coll.id] = data
+
+        #     structured_data = {hardware_doc.id: hardware_sensor_data}
+        #     data_list.append(structured_data)
+
+        # if not data_list:
+        #     return None  
+
+        # with open("sample.txt", "w") as f:
+        #     f.write(json.dumps(data_list, indent=4)) 
+
+        # return data_list
     
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
@@ -176,6 +248,7 @@ async def ma_analysis(df, column, window_size, interval, is_append):
                 
     return df
 
+
 async def process_columns(df, columns, is_append):
     tasks = []
     for column in columns:
@@ -184,6 +257,7 @@ async def process_columns(df, columns, is_append):
         tasks.append(ma_analysis(df, column, 30, 'monthly', is_append))
     await asyncio.gather(*tasks)
 
+
 def reorder_and_filter_columns(df):
     columns_to_remove = [
         'humidity',
@@ -191,7 +265,8 @@ def reorder_and_filter_columns(df):
         'temperature',
         'soilMoisture1',
         'soilMoisture2',
-        'soilMoisture3'
+        'soilMoisture3',
+        'cropType'
     ]
 
     preferred_column_order = [
@@ -314,75 +389,89 @@ def classify_overall_status(value):
 
 
 def fuzzy_logic_overall_status(df):
-    def create_fuzzy_system():
-        # Define fuzzy variables
-        # https://bagong.pagasa.dost.gov.ph/information/climate-philippines
-        # Temperature 0-50
-        temperature_mean = ctrl.Antecedent(np.arange(0, 51, 1), 'temperature_mean')
-        # Humidity 0-100
-        humidity_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'humidity_mean')
-        # Light Intensity 0-65536
-        lightIntensity_mean = ctrl.Antecedent(np.arange(0, 65536, 1), 'lightIntensity_mean')
-        # Soil Moisture 1,2,3 0-100
-        soilMoisture1_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'soilMoisture1_mean')
-        soilMoisture2_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'soilMoisture2_mean')
-        soilMoisture3_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'soilMoisture3_mean')
-        # Overall if 100 perfectly healthy
-        overall_status = ctrl.Consequent(np.arange(0, 101, 1), 'overall_status')
+    def create_fuzzy_system(crop_type):
+        if (crop_type == "tomato"):
+            # Define fuzzy variables
+            # https://bagong.pagasa.dost.gov.ph/information/climate-philippines
+            # Temperature 0-50
+            temperature_mean = ctrl.Antecedent(np.arange(0, 51, 1), 'temperature_mean')
+            # Humidity 0-100
+            humidity_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'humidity_mean')
+            # Light Intensity 0-65536
+            lightIntensity_mean = ctrl.Antecedent(np.arange(0, 65536, 1), 'lightIntensity_mean')
+            # Soil Moisture 1,2,3 0-100
+            soilMoisture1_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'soilMoisture1_mean')
+            soilMoisture2_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'soilMoisture2_mean')
+            soilMoisture3_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'soilMoisture3_mean')
+            # Overall if 100 perfectly healthy
+            overall_status = ctrl.Consequent(np.arange(0, 101, 1), 'overall_status')
 
-        # Define fuzzy membership functions
-        temperature_mean['low'] = fuzz.trimf(temperature_mean.universe, [0, 0, 20])
-        temperature_mean['ideal'] = fuzz.trimf(temperature_mean.universe, [18, 21, 25])
-        temperature_mean['high'] = fuzz.trimf(temperature_mean.universe, [23, 50, 50])
+            # Define fuzzy membership functions
+            temperature_mean['low'] = fuzz.trimf(temperature_mean.universe, [0, 0, 20])
+            temperature_mean['ideal'] = fuzz.trimf(temperature_mean.universe, [18, 21, 25])
+            temperature_mean['high'] = fuzz.trimf(temperature_mean.universe, [23, 50, 50])
 
-        humidity_mean['low'] = fuzz.trimf(humidity_mean.universe, [0, 0, 30])
-        humidity_mean['ideal'] = fuzz.trimf(humidity_mean.universe, [30, 45, 60])
-        humidity_mean['high'] = fuzz.trimf(humidity_mean.universe, [60, 100, 100])
+            humidity_mean['low'] = fuzz.trimf(humidity_mean.universe, [0, 0, 30])
+            humidity_mean['ideal'] = fuzz.trimf(humidity_mean.universe, [30, 45, 60])
+            humidity_mean['high'] = fuzz.trimf(humidity_mean.universe, [60, 100, 100])
 
-        lightIntensity_mean['low'] = fuzz.trimf(lightIntensity_mean.universe, [0, 0, 20000])
-        lightIntensity_mean['ideal'] = fuzz.trimf(lightIntensity_mean.universe, [20000, 35000, 60000])
-        lightIntensity_mean['high'] = fuzz.trimf(lightIntensity_mean.universe, [50000, 65536, 65536])
+            lightIntensity_mean['low'] = fuzz.trimf(lightIntensity_mean.universe, [0, 0, 20000])
+            lightIntensity_mean['ideal'] = fuzz.trimf(lightIntensity_mean.universe, [20000, 35000, 60000])
+            lightIntensity_mean['high'] = fuzz.trimf(lightIntensity_mean.universe, [50000, 65536, 65536])
 
-        soilMoisture1_mean['low'] = fuzz.trimf(soilMoisture1_mean.universe, [0, 0, 30])  
-        soilMoisture1_mean['ideal'] = fuzz.trimf(soilMoisture1_mean.universe, [40, 60, 80])  
-        soilMoisture1_mean['high'] = fuzz.trimf(soilMoisture1_mean.universe, [70, 100, 100])  
+            soilMoisture1_mean['low'] = fuzz.trimf(soilMoisture1_mean.universe, [0, 0, 30])  
+            soilMoisture1_mean['ideal'] = fuzz.trimf(soilMoisture1_mean.universe, [40, 60, 80])  
+            soilMoisture1_mean['high'] = fuzz.trimf(soilMoisture1_mean.universe, [70, 100, 100])  
 
-        soilMoisture2_mean['low'] = fuzz.trimf(soilMoisture2_mean.universe, [0, 0, 30])  
-        soilMoisture2_mean['ideal'] = fuzz.trimf(soilMoisture2_mean.universe, [40, 60, 80])  
-        soilMoisture2_mean['high'] = fuzz.trimf(soilMoisture2_mean.universe, [70, 100, 100])  
+            soilMoisture2_mean['low'] = fuzz.trimf(soilMoisture2_mean.universe, [0, 0, 30])  
+            soilMoisture2_mean['ideal'] = fuzz.trimf(soilMoisture2_mean.universe, [40, 60, 80])  
+            soilMoisture2_mean['high'] = fuzz.trimf(soilMoisture2_mean.universe, [70, 100, 100])  
 
-        soilMoisture3_mean['low'] = fuzz.trimf(soilMoisture3_mean.universe, [0, 0, 30])  
-        soilMoisture3_mean['ideal'] = fuzz.trimf(soilMoisture3_mean.universe, [40, 60, 80])  
-        soilMoisture3_mean['high'] = fuzz.trimf(soilMoisture3_mean.universe, [70, 100, 100])  
+            soilMoisture3_mean['low'] = fuzz.trimf(soilMoisture3_mean.universe, [0, 0, 30])  
+            soilMoisture3_mean['ideal'] = fuzz.trimf(soilMoisture3_mean.universe, [40, 60, 80])  
+            soilMoisture3_mean['high'] = fuzz.trimf(soilMoisture3_mean.universe, [70, 100, 100])  
 
-        overall_status['unhealthy'] = fuzz.trimf(overall_status.universe, [0, 0, 50])
-        overall_status['healthy'] = fuzz.trimf(overall_status.universe, [50, 100, 100])
+            overall_status['unhealthy'] = fuzz.trimf(overall_status.universe, [0, 0, 50])
+            overall_status['healthy'] = fuzz.trimf(overall_status.universe, [50, 100, 100])
 
-        # Define fuzzy rules (TENTATIVE VALUES)
-        rule1 = ctrl.Rule(
-            temperature_mean['low'] | humidity_mean['low'] | lightIntensity_mean['low'] | 
-            soilMoisture1_mean['low'] | soilMoisture2_mean['low'] | soilMoisture3_mean['low'], 
-            overall_status['unhealthy']
-        )
-        rule2 = ctrl.Rule(
-            temperature_mean['ideal'] & humidity_mean['ideal'] & lightIntensity_mean['ideal'] & 
-            soilMoisture1_mean['ideal'] & soilMoisture2_mean['ideal'] & soilMoisture3_mean['ideal'], 
-            overall_status['healthy']
-        )
-        rule3 = ctrl.Rule(
-            temperature_mean['high'] & humidity_mean['high'] & lightIntensity_mean['high'] & 
-            soilMoisture1_mean['high'] & soilMoisture2_mean['high'] & soilMoisture3_mean['high'], 
-            overall_status['unhealthy']
-        )
+            # Define fuzzy rules (TENTATIVE VALUES)
+            rule1 = ctrl.Rule(
+                temperature_mean['low'] | humidity_mean['low'] | lightIntensity_mean['low'] | 
+                soilMoisture1_mean['low'] | soilMoisture2_mean['low'] | soilMoisture3_mean['low'], 
+                overall_status['unhealthy']
+            )
+            rule2 = ctrl.Rule(
+                temperature_mean['ideal'] & humidity_mean['ideal'] & lightIntensity_mean['ideal'] & 
+                soilMoisture1_mean['ideal'] & soilMoisture2_mean['ideal'] & soilMoisture3_mean['ideal'], 
+                overall_status['healthy']
+            )
+            rule3 = ctrl.Rule(
+                temperature_mean['high'] & humidity_mean['high'] & lightIntensity_mean['high'] & 
+                soilMoisture1_mean['high'] & soilMoisture2_mean['high'] & soilMoisture3_mean['high'], 
+                overall_status['unhealthy']
+            )
+            # Create control system
+            overall_status_ctrl = ctrl.ControlSystem([rule1, rule2, rule3])
+        
+        elif crop_type == "potato":
+            print("Nasa POTATO ka na fuzzy system")
+            exit(0)
+        elif crop_type == "cucumber":
+            print("Nasa CUCUMBER ka na fuzzy system")
+            exit(0)
+        elif crop_type == "pepper":
+            print("Nasa PEPPER ka na fuzzy system")
+            exit(0)
 
-        # Create control system
-        overall_status_ctrl = ctrl.ControlSystem([rule1, rule2, rule3])
         return ctrl.ControlSystemSimulation(overall_status_ctrl)
 
+    # Get the crop type (just one is enough because they are the same)
+    crop_type = df['cropType'][0]
+
     # Create fuzzy systems for daily, weekly, and monthly
-    daily_fuzzy_system = create_fuzzy_system()
-    weekly_fuzzy_system = create_fuzzy_system()
-    monthly_fuzzy_system = create_fuzzy_system()
+    daily_fuzzy_system = create_fuzzy_system(crop_type)
+    weekly_fuzzy_system = create_fuzzy_system(crop_type)
+    monthly_fuzzy_system = create_fuzzy_system(crop_type)
 
     # Apply fuzzy logic to overall status for each interval
     df['daily_overall_status'] = df.apply(lambda row: get_fuzzy_status_combined(row, daily_fuzzy_system, 'daily'), axis=1)
@@ -418,60 +507,61 @@ def get_fuzzy_status_combined(row, fuzzy_system, interval):
 async def main():
     hardwares = fetch_data("hardwares")
 
+    # For speed up
+    # with open("sample.txt", "r") as file:
+    #     hardwares = json.load(file)
+
     if not hardwares:
         print("No data fetched")
         return
-    
-    for i, hardware in enumerate(hardwares):
+
+    for hardware in hardwares:
         for hardware_id, hardware_data in hardware.items():
-            if hardware_id == 'hardware120502' or hardware_id == 'hardware120503':
-                # Flatten the nested dictionary
-                flattened_data = []
-                for date, sensors_data in hardware_data.items():
-                    all_data = {}
-                    all_data['date'] = str(date)
-                    for sensor, data in sensors_data.items():
-                        all_data[sensor] = data
-                    flattened_data.append(all_data)
+            print(hardware_id)
+            print(hardware_data)
+            # Flatten the nested dictionary
+            flattened_data = []
+            for date, sensors_data in hardware_data.items():
+                all_data = {}
+                all_data['date'] = '-'.join(date.split('-')[:3])
+                for sensor, data in sensors_data.items():
+                    all_data[sensor] = data
+                flattened_data.append(all_data)
 
-                # print(json.dumps(flattened_data, indent=4))
+            # print(json.dumps(flattened_data, indent=4))
 
-                # Create a DataFrame from the flattened data
-                df = pd.DataFrame(flattened_data)
+            # Create a DataFrame from the flattened data
+            df = pd.DataFrame(flattened_data)
 
-                # Reorder columns to have 'date' first
-                df = df[['date'] + [col for col in df.columns if col != 'date']]          
-                
-                # Convert relevant columns to numeric
-                columns = ['temperature', 'humidity', 'lightIntensity', 'soilMoisture1', 'soilMoisture2', 'soilMoisture3']
-                for column in columns:
-                    df[column] = pd.to_numeric(df[column], errors='coerce')
-                
-                # Get MA of sensors output for daily, weekly, monthly
-                await process_columns(df, columns, is_append)
+            # Reorder columns to have 'date' first
+            df = df[['date'] + [col for col in df.columns if col != 'date']]          
+            
+            # Convert relevant columns to numeric
+            columns = ['temperature', 'humidity', 'lightIntensity', 'soilMoisture1', 'soilMoisture2', 'soilMoisture3']
+            for column in columns:
+                df[column] = pd.to_numeric(df[column], errors='coerce')
+            
+            # Get MA of sensors output for daily, weekly, monthly
+            await process_columns(df, columns, is_append)
 
-                # Get sensor value status
-                for column in columns:
-                    df = get_sensor_value_status(df, column)
+            # Get sensor value status
+            for column in columns:
+                df = get_sensor_value_status(df, column)
 
-                print(df)
+            # print(df)
 
-                # Apply fuzzy logic for overall status
-                df = fuzzy_logic_overall_status(df)
-                
-                # Filter and rearrange the column order
-                df = reorder_and_filter_columns(df)
+            # Apply fuzzy logic for overall status
+            df = fuzzy_logic_overall_status(df)
+            
+            # Filter and rearrange the column order
+            df = reorder_and_filter_columns(df)
 
-                # Write to CSV file
-                with open(f"output{i}.txt", 'w') as f:
-                    f.write(df.to_string())
+            # Write to CSV file
+            with open(f"{hardware_id}.txt", 'w') as f:
+                f.write(df.to_string())
 
-                save_analysis(df, hardware_id=hardware_id, is_append=is_append)
-            else:
-                print("Hardware ID: ", hardware_id)
-                continue
+            save_analysis(df, hardware_id=hardware_id, is_append=is_append)
 
-    # CREATE A SEPARATE FILE TO TEST YOUR FUZZY LOGIC TO MOCK DATA OF (DAILY ONLY)
     # FIND RELIABLE DATA FOR BAD, GOOD, HEALTHY DATA
 
 

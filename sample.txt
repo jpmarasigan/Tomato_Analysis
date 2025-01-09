@@ -1,114 +1,77 @@
 [
     {
-        "hardware1000": {
-            "cropData": {}
-        }
-    },
-    {
-        "hardware1205": {}
-    },
-    {
         "hardware120502": {
-            "2024-12-26": {
-                "humidity": 21,
-                "temperature": 29.7,
-                "lightIntensity": 55,
-                "soilMoisture1": 105,
-                "soilMoisture3": 89.0,
-                "soilMoisture2": 91
-            },
-            "2024-12-27": {
+            "2025-01-01-19:57": {
                 "humidity": -1.0,
-                "lightIntensity": 88,
-                "temperature": -1.0,
-                "soilMoisture1": 92.0,
-                "soilMoisture2": 100.0,
-                "soilMoisture3": 92.0
-            },
-            "2024-12-28": {
-                "humidity": -1.0,
-                "soilMoisture2": 76.0,
-                "soilMoisture3": 70.0,
-                "createdAt": "2024-12-28 02:28",
-                "lightIntensity": 22.0,
-                "soilMoisture1": 65.0,
-                "temperature": -1.0
-            },
-            "2024-12-31": {
-                "humidity": 78.0,
-                "soilMoisture2": 49.0,
-                "soilMoisture3": 38.0,
-                "createdAt": "2024-12-31 01:26",
-                "lightIntensity": 46.0,
-                "soilMoisture1": 47.0,
-                "temperature": 30.0
-            },
-            "2025-01-01": {
-                "humidity": -1.0,
-                "soilMoisture2": 77.0,
-                "soilMoisture3": 52.0,
-                "createdAt": "2025-01-01 17:20",
+                "soilMoisture2": 95.0,
+                "soilMoisture3": 95.0,
+                "createdAt": "2025-01-01 19:57",
                 "lightIntensity": 1.0,
-                "soilMoisture1": 84.0,
-                "temperature": -1.0
-            }
-        }
-    },
-    {
-        "hardware120503": {
-            "2024-12-28": {
-                "humidity": 20,
-                "soilMoisture2": 42,
-                "soilMoisture3": 22,
-                "createdAt": "2024-12-27T17:41:31.676000+00:00",
-                "temperature": 10,
-                "soilMoisture1": 40,
-                "lightIntensity": 30
+                "soilMoisture1": 90.0,
+                "temperature": -1.0,
+                "cropType": "tomato"
             },
-            "2025-01-01": {
-                "humidity": 20,
-                "soilMoisture2": 95,
-                "soilMoisture3": 96,
-                "createdAt": "2025-01-01T09:34:54.224000+00:00",
-                "temperature": 10,
-                "soilMoisture1": 94,
-                "lightIntensity": 30
-            }
-        }
-    },
-    {
-        "hardware120504": {
-            "2024-12-28": {
-                "humidity": 20,
-                "createdAt": "2024-12-27T18:19:43.791000+00:00",
-                "temperature": 10,
-                "soilMoisture1": 40,
-                "lightIntensity": 30
-            }
-        }
-    },
-    {
-        "hardware2000": {
-            "cropData": {}
-        }
-    },
-    {
-        "hardware2028": {
-            "2024-12-26": {
-                "humidity": 82.4,
-                "lightIntensity": 80.0,
+            "2025-01-07-23:03": {
+                "humidity": 80.0,
+                "soilMoisture2": 0.0,
+                "soilMoisture3": 0.0,
+                "createdAt": "2025-01-07 23:03",
+                "lightIntensity": 91.0,
+                "soilMoisture1": 0.0,
+                "temperature": 28.9,
+                "cropType": "tomato"
+            },
+            "2025-01-08-20:06": {
+                "humidity": 70.0,
+                "soilMoisture2": 0.0,
+                "soilMoisture3": 0.0,
+                "createdAt": "2025-01-08 20:06",
+                "lightIntensity": 71.0,
+                "soilMoisture1": 100.0,
+                "temperature": 29.2,
+                "cropType": "tomato"
+            },
+            "2025-01-09-21:13": {
+                "humidity": 67.0,
+                "soilMoisture2": 0.0,
+                "soilMoisture3": 0.0,
+                "createdAt": "2025-01-09 21:13",
+                "lightIntensity": 3.0,
+                "soilMoisture1": 100.0,
                 "temperature": 29.0,
-                "soilMoisture1": 5.0,
-                "soilMoisture2": 0.0,
-                "soilMoisture3": 1.0
+                "cropType": "tomato"
+            }
+        },
+        "hardware010125": {
+            "2025-01-01-19:56": {
+                "humidity": -1.0,
+                "soilMoisture2": 95.0,
+                "soilMoisture3": 95.0,
+                "createdAt": "2025-01-01 19:56",
+                "lightIntensity": 0.0,
+                "soilMoisture1": 90.0,
+                "temperature": -1.0,
+                "cropType": "cucumber"
             },
-            "2024-12-27": {
-                "humidity": 82.2,
-                "lightIntensity": 84.0,
-                "temperature": 29.1,
-                "soilMoisture1": 4.0,
+            "2025-01-06-21:14": {
+                "humidity": -1.0,
                 "soilMoisture2": 0.0,
-                "soilMoisture3": 1.0
+                "soilMoisture3": 0.0,
+                "createdAt": "2025-01-06 21:14",
+                "lightIntensity": 36.0,
+                "soilMoisture1": 0.0,
+                "temperature": -1.0,
+                "cropType": "cucumber"
+            },
+            "2025-01-07-01:13": {
+                "humidity": 81.0,
+                "soilMoisture2": 65.0,
+                "soilMoisture3": 2.0,
+                "createdAt": "2025-01-07 01:13",
+                "lightIntensity": 0.0,
+                "soilMoisture1": 82.0,
+                "temperature": 29.0,
+                "cropType": "cucumber"
             }
         }
     }
