@@ -1,0 +1,7 @@
+                Sensor  Value   Low  Ideal      High
+0     temperature_mean     22  0.56    0.0  0.000000
+1        humidity_mean     50  0.00    0.0  0.677419
+2  lightIntensity_mean     80  0.00    1.0  0.000000
+3   soilMoisture1_mean     70  0.00    1.0  0.000000
+4   soilMoisture2_mean     70  0.00    1.0  0.000000
+5   soilMoisture3_mean     70  0.00    1.0  0.000000
