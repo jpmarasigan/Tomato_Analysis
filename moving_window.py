@@ -6,6 +6,7 @@ import numpy as np
 import skfuzzy as fuzz
 from skfuzzy import control as ctrl
 from collections import defaultdict
+import matplotlib.pyplot as plt
 import json
 import asyncio  # Import asyncio for asynchronous programming
 import time
@@ -40,7 +41,7 @@ def fetch_data(collection_name):
     hardware_crop_dict = {}
 
     try:
-        main_col_ref = db.collection("users")
+        main_col_ref = db.collection(collection_name)
         user_doc_ref = main_col_ref.stream()
         user_ids = [doc.id for doc in user_doc_ref]
         
@@ -325,13 +326,17 @@ def save_analysis(latest_df, hardware_id, is_append):
             if not parent_doc_ref.get().exists:
                 parent_doc_ref.set({"initialized": True})
 
+            # Get the date from the row (assuming 'date' is a string in the format YYYY-MM-DD)
+            date_str = datetime.datetime.strptime(row['date'], '%Y-%m-%d').strftime('%Y%m%d')  # Convert to YYYYMMDD
+            document_id = f"{date_str}"  # Format as YYYYMMDDtomato
+
             # Get date document which is the unique key for date
             date_collection_ref = db.collection("Analysis2").document(str(hardware_id)).collection("dates")
-            doc_ref = date_collection_ref.add({"initialized": True})
+            doc_ref = date_collection_ref.document(document_id)
             
             # drop date value
             # row_data_without_date = row.drop(labels='date')
-            batch.set(doc_ref[1], row.to_dict(), merge=True)  # Add to batch
+            batch.set(doc_ref, row.to_dict(), merge=True)  # Add to batch
         except Exception as e:
             print(f"An error occured: {e}")
         
@@ -383,87 +388,164 @@ def get_sensor_value_status(df, column):
 
 def classify_overall_status(value):
     if value >= 50:
-        return 'good'
+        return 'healthy'
     else:
-        return 'bad'
+        return 'unhealthy'
 
 
 def fuzzy_logic_overall_status(df):
     def create_fuzzy_system(crop_type):
-        if (crop_type == "tomato"):
-            # Define fuzzy variables
-            # https://bagong.pagasa.dost.gov.ph/information/climate-philippines
-            # Temperature 0-50
-            temperature_mean = ctrl.Antecedent(np.arange(0, 51, 1), 'temperature_mean')
-            # Humidity 0-100
-            humidity_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'humidity_mean')
-            # Light Intensity 0-65536
-            lightIntensity_mean = ctrl.Antecedent(np.arange(0, 65536, 1), 'lightIntensity_mean')
-            # Soil Moisture 1,2,3 0-100
-            soilMoisture1_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'soilMoisture1_mean')
-            soilMoisture2_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'soilMoisture2_mean')
-            soilMoisture3_mean = ctrl.Antecedent(np.arange(0, 101, 1), 'soilMoisture3_mean')
-            # Overall if 100 perfectly healthy
-            overall_status = ctrl.Consequent(np.arange(0, 101, 1), 'overall_status')
-
-            # Define fuzzy membership functions
-            temperature_mean['low'] = fuzz.trimf(temperature_mean.universe, [0, 0, 20])
-            temperature_mean['ideal'] = fuzz.trimf(temperature_mean.universe, [18, 21, 25])
-            temperature_mean['high'] = fuzz.trimf(temperature_mean.universe, [23, 50, 50])
-
-            humidity_mean['low'] = fuzz.trimf(humidity_mean.universe, [0, 0, 30])
-            humidity_mean['ideal'] = fuzz.trimf(humidity_mean.universe, [30, 45, 60])
-            humidity_mean['high'] = fuzz.trimf(humidity_mean.universe, [60, 100, 100])
-
-            lightIntensity_mean['low'] = fuzz.trimf(lightIntensity_mean.universe, [0, 0, 20000])
-            lightIntensity_mean['ideal'] = fuzz.trimf(lightIntensity_mean.universe, [20000, 35000, 60000])
-            lightIntensity_mean['high'] = fuzz.trimf(lightIntensity_mean.universe, [50000, 65536, 65536])
-
-            soilMoisture1_mean['low'] = fuzz.trimf(soilMoisture1_mean.universe, [0, 0, 30])  
-            soilMoisture1_mean['ideal'] = fuzz.trimf(soilMoisture1_mean.universe, [40, 60, 80])  
-            soilMoisture1_mean['high'] = fuzz.trimf(soilMoisture1_mean.universe, [70, 100, 100])  
-
-            soilMoisture2_mean['low'] = fuzz.trimf(soilMoisture2_mean.universe, [0, 0, 30])  
-            soilMoisture2_mean['ideal'] = fuzz.trimf(soilMoisture2_mean.universe, [40, 60, 80])  
-            soilMoisture2_mean['high'] = fuzz.trimf(soilMoisture2_mean.universe, [70, 100, 100])  
-
-            soilMoisture3_mean['low'] = fuzz.trimf(soilMoisture3_mean.universe, [0, 0, 30])  
-            soilMoisture3_mean['ideal'] = fuzz.trimf(soilMoisture3_mean.universe, [40, 60, 80])  
-            soilMoisture3_mean['high'] = fuzz.trimf(soilMoisture3_mean.universe, [70, 100, 100])  
-
-            overall_status['unhealthy'] = fuzz.trimf(overall_status.universe, [0, 0, 50])
-            overall_status['healthy'] = fuzz.trimf(overall_status.universe, [50, 100, 100])
-
-            # Define fuzzy rules (TENTATIVE VALUES)
-            rule1 = ctrl.Rule(
-                temperature_mean['low'] | humidity_mean['low'] | lightIntensity_mean['low'] | 
-                soilMoisture1_mean['low'] | soilMoisture2_mean['low'] | soilMoisture3_mean['low'], 
-                overall_status['unhealthy']
-            )
-            rule2 = ctrl.Rule(
-                temperature_mean['ideal'] & humidity_mean['ideal'] & lightIntensity_mean['ideal'] & 
-                soilMoisture1_mean['ideal'] & soilMoisture2_mean['ideal'] & soilMoisture3_mean['ideal'], 
-                overall_status['healthy']
-            )
-            rule3 = ctrl.Rule(
-                temperature_mean['high'] & humidity_mean['high'] & lightIntensity_mean['high'] & 
-                soilMoisture1_mean['high'] & soilMoisture2_mean['high'] & soilMoisture3_mean['high'], 
-                overall_status['unhealthy']
-            )
-            # Create control system
-            overall_status_ctrl = ctrl.ControlSystem([rule1, rule2, rule3])
+        temperature_mean = ctrl.Antecedent(np.arange(-1, 61, 1), 'temperature_mean')
+        humidity_mean = ctrl.Antecedent(np.arange(-1, 102, 1), 'humidity_mean')
+        lightIntensity_mean = ctrl.Antecedent(np.arange(-1, 102, 1), 'lightIntensity_mean')
+        soilMoisture1_mean = ctrl.Antecedent(np.arange(-1, 102, 1), 'soilMoisture1_mean')
+        soilMoisture2_mean = ctrl.Antecedent(np.arange(-1, 102, 1), 'soilMoisture2_mean')
+        soilMoisture3_mean = ctrl.Antecedent(np.arange(-1, 102, 1), 'soilMoisture3_mean')
+        # Overall if 100 perfectly healthy
+        overall_status = ctrl.Consequent(np.arange(-1, 101, 1), 'overall_status')
         
-        elif crop_type == "potato":
-            print("Nasa POTATO ka na fuzzy system")
-            exit(0)
-        elif crop_type == "cucumber":
-            print("Nasa CUCUMBER ka na fuzzy system")
-            exit(0)
-        elif crop_type == "pepper":
-            print("Nasa PEPPER ka na fuzzy system")
-            exit(0)
+        if crop_type.lower() == "potato":
+            # Ideal Temp 13-29
+            temperature_mean['not ideal low'] = fuzz.trimf(temperature_mean.universe, [-1, -1, 13])
+            temperature_mean['ideal'] = fuzz.trimf(temperature_mean.universe, [12, 21, 30])     
+            temperature_mean['not ideal high'] = fuzz.trimf(temperature_mean.universe, [29, 60, 60])
+            
+            # Ideal Humid 50-(60-80)-100
+            humidity_mean['not ideal low'] = fuzz.trimf(humidity_mean.universe, [-1, -1, 50])
+            humidity_mean['ideal'] = fuzz.trapmf(humidity_mean.universe, [49, 60, 80, 101])
+            humidity_mean['not ideal high'] = fuzz.trimf(humidity_mean.universe, [100, 101, 101])
 
+            # Ideal Light Exposure 70-(80-100)
+            lightIntensity_mean['not ideal low'] = fuzz.trimf(lightIntensity_mean.universe, [-1, -1, 70])
+            lightIntensity_mean['ideal'] = fuzz.trapmf(lightIntensity_mean.universe, [69, 80, 100, 101])
+            lightIntensity_mean['not ideal high'] = fuzz.trimf(lightIntensity_mean.universe, [100, 101, 101])
+
+            # Ideal Soil Moisture 70-90
+            soilMoisture1_mean['not ideal low'] = fuzz.trimf(soilMoisture1_mean.universe, [-1, -1, 70])
+            soilMoisture1_mean['ideal'] = fuzz.trapmf(soilMoisture1_mean.universe, [69, 70, 90, 91])
+            soilMoisture1_mean['not ideal high'] = fuzz.trimf(soilMoisture1_mean.universe, [90, 100, 100])
+            soilMoisture2_mean['not ideal low'] = fuzz.trimf(soilMoisture2_mean.universe, [-1, -1, 70])
+            soilMoisture2_mean['ideal'] = fuzz.trapmf(soilMoisture2_mean.universe, [69, 70, 90, 91])
+            soilMoisture2_mean['not ideal high'] = fuzz.trimf(soilMoisture2_mean.universe, [90, 100, 100])
+            soilMoisture3_mean['not ideal low'] = fuzz.trimf(soilMoisture3_mean.universe, [-1, -1, 70])
+            soilMoisture3_mean['ideal'] = fuzz.trapmf(soilMoisture3_mean.universe, [69, 70, 90, 91])
+            soilMoisture3_mean['not ideal high'] = fuzz.trimf(soilMoisture3_mean.universe, [90, 100, 100])
+        
+        elif crop_type.lower() == 'tomato':
+            # Ideal Temp 22-29
+            temperature_mean['not ideal low'] = fuzz.trimf(temperature_mean.universe, [-1, -1, 22])
+            temperature_mean['ideal'] = fuzz.trimf(temperature_mean.universe, [21, 26, 30])     
+            temperature_mean['not ideal high'] = fuzz.trimf(temperature_mean.universe, [29, 60, 60])
+            
+            # Ideal Humid 65-85
+            humidity_mean['not ideal low'] = fuzz.trimf(humidity_mean.universe, [-1, -1, 65])
+            humidity_mean['ideal'] = fuzz.trapmf(humidity_mean.universe, [64, 65, 85, 86])
+            humidity_mean['not ideal high'] = fuzz.trimf(humidity_mean.universe, [85, 101, 101])
+
+            # Ideal Light Exposure 70-(80-100)
+            lightIntensity_mean['not ideal low'] = fuzz.trimf(lightIntensity_mean.universe, [-1, -1, 70])
+            lightIntensity_mean['ideal'] = fuzz.trapmf(lightIntensity_mean.universe, [69, 80, 100, 101])
+            lightIntensity_mean['not ideal high'] = fuzz.trimf(lightIntensity_mean.universe, [100, 101, 101])
+
+            # Ideal Soil Moisture 50-70
+            soilMoisture1_mean['not ideal low'] = fuzz.trimf(soilMoisture1_mean.universe, [-1, -1, 50])
+            soilMoisture1_mean['ideal'] = fuzz.trapmf(soilMoisture1_mean.universe, [49, 50, 70, 71])
+            soilMoisture1_mean['not ideal high'] = fuzz.trimf(soilMoisture1_mean.universe, [70, 100, 100])
+            soilMoisture2_mean['not ideal low'] = fuzz.trimf(soilMoisture2_mean.universe, [-1, -1, 50])
+            soilMoisture2_mean['ideal'] = fuzz.trapmf(soilMoisture2_mean.universe, [49, 50, 70, 71])
+            soilMoisture2_mean['not ideal high'] = fuzz.trimf(soilMoisture2_mean.universe, [70, 100, 100])
+            soilMoisture3_mean['not ideal low'] = fuzz.trimf(soilMoisture3_mean.universe, [-1, -1, 50])
+            soilMoisture3_mean['ideal'] = fuzz.trapmf(soilMoisture3_mean.universe, [49, 50, 70, 71])
+            soilMoisture3_mean['not ideal high'] = fuzz.trimf(soilMoisture3_mean.universe, [70, 100, 100])
+        
+        elif crop_type.lower() == 'pepper':
+            # Ideal Temp 16-21
+            temperature_mean['not ideal low'] = fuzz.trimf(temperature_mean.universe, [-1, -1, 16])
+            temperature_mean['ideal'] = fuzz.trapmf(temperature_mean.universe, [15, 16, 21, 22])     
+            temperature_mean['not ideal high'] = fuzz.trimf(temperature_mean.universe, [21, 60, 60])
+
+            # Ideal Humid 65-85
+            humidity_mean['not ideal low'] = fuzz.trimf(humidity_mean.universe, [-1, -1, 65])
+            humidity_mean['ideal'] = fuzz.trapmf(humidity_mean.universe, [64, 65, 85, 86])
+            humidity_mean['not ideal high'] = fuzz.trimf(humidity_mean.universe, [85, 101, 101])
+
+            # Ideal Light Exposure 60-100
+            lightIntensity_mean['not ideal low'] = fuzz.trimf(lightIntensity_mean.universe, [-1, -1, 60])
+            lightIntensity_mean['ideal'] = fuzz.trapmf(lightIntensity_mean.universe, [59, 60, 100, 101])
+            lightIntensity_mean['not ideal high'] = fuzz.trimf(lightIntensity_mean.universe, [100, 101, 101])
+
+            # Ideal Soil Moisture 20-60
+            soilMoisture1_mean['not ideal low'] = fuzz.trimf(soilMoisture1_mean.universe, [-1, -1, 20])
+            soilMoisture1_mean['ideal'] = fuzz.trapmf(soilMoisture1_mean.universe, [19, 20, 60, 61])
+            soilMoisture1_mean['not ideal high'] = fuzz.trimf(soilMoisture1_mean.universe, [60, 100, 100])
+            soilMoisture2_mean['not ideal low'] = fuzz.trimf(soilMoisture2_mean.universe, [-1, -1, 20])
+            soilMoisture2_mean['ideal'] = fuzz.trapmf(soilMoisture2_mean.universe, [19, 20, 60, 61])
+            soilMoisture2_mean['not ideal high'] = fuzz.trimf(soilMoisture2_mean.universe, [60, 100, 100])
+            soilMoisture3_mean['not ideal low'] = fuzz.trimf(soilMoisture3_mean.universe, [-1, -1, 20])
+            soilMoisture3_mean['ideal'] = fuzz.trapmf(soilMoisture3_mean.universe, [19, 20, 60, 61])
+            soilMoisture3_mean['not ideal high'] = fuzz.trimf(soilMoisture3_mean.universe, [60, 100, 100])
+        
+        elif crop_type.lower() == 'cucumber':
+            # Ideal Temp 18-35
+            temperature_mean['not ideal low'] = fuzz.trimf(temperature_mean.universe, [-1, -1, 15])
+            temperature_mean['ideal'] = fuzz.trapmf(temperature_mean.universe, [14, 21, 26, 30])     
+            temperature_mean['not ideal high'] = fuzz.trimf(temperature_mean.universe, [29, 60, 60])
+
+            # Ideal Humid 60-85
+            humidity_mean['not ideal low'] = fuzz.trimf(humidity_mean.universe, [-1, -1, 60])
+            humidity_mean['ideal'] = fuzz.trapmf(humidity_mean.universe, [59, 60, 85, 86])
+            humidity_mean['not ideal high'] = fuzz.trimf(humidity_mean.universe, [85, 101, 101])
+
+            # Ideal Light Exposure 60-100
+            lightIntensity_mean['not ideal low'] = fuzz.trimf(lightIntensity_mean.universe, [-1, -1, 70])
+            lightIntensity_mean['ideal'] = fuzz.trapmf(lightIntensity_mean.universe, [69, 70, 100, 101])
+            lightIntensity_mean['not ideal high'] = fuzz.trimf(lightIntensity_mean.universe, [100, 101, 101])
+
+            # Ideal Soil Moisture 80-100
+            soilMoisture1_mean['not ideal low'] = fuzz.trimf(soilMoisture1_mean.universe, [-1, -1, 80])
+            soilMoisture1_mean['ideal'] = fuzz.trapmf(soilMoisture1_mean.universe, [79, 80, 100, 101])
+            soilMoisture1_mean['not ideal high'] = fuzz.trimf(soilMoisture1_mean.universe, [100, 101, 101])
+            soilMoisture2_mean['not ideal low'] = fuzz.trimf(soilMoisture2_mean.universe, [-1, -1, 80])
+            soilMoisture2_mean['ideal'] = fuzz.trapmf(soilMoisture2_mean.universe, [79, 80, 100, 101])
+            soilMoisture2_mean['not ideal high'] = fuzz.trimf(soilMoisture2_mean.universe, [100, 101, 101])
+            soilMoisture3_mean['not ideal low'] = fuzz.trimf(soilMoisture3_mean.universe, [-1, -1, 80])
+            soilMoisture3_mean['ideal'] = fuzz.trapmf(soilMoisture3_mean.universe, [79, 80, 100, 101])
+            soilMoisture3_mean['not ideal high'] = fuzz.trimf(soilMoisture3_mean.universe, [100, 101, 101])
+
+        
+        sensors = {
+            'temperature_mean': temperature_mean,
+            'humidity_mean': humidity_mean,
+            'lightIntensity_mean': lightIntensity_mean,
+            'soilMoisture1_mean': soilMoisture1_mean,
+            'soilMoisture2_mean': soilMoisture2_mean,
+            'soilMoisture3_mean': soilMoisture3_mean
+        }
+        
+        # display_calculated_membership(sensors)
+
+        overall_status['unhealthy'] = fuzz.trimf(overall_status.universe, [0, 0, 50])
+        overall_status['healthy'] = fuzz.trimf(overall_status.universe, [50, 100, 100])
+
+        rule1 = ctrl.Rule(
+            humidity_mean['not ideal low'] | humidity_mean['not ideal high'] |
+            temperature_mean['not ideal low'] | temperature_mean['not ideal high'] |
+            lightIntensity_mean['not ideal low'] | lightIntensity_mean['not ideal high'] | 
+            soilMoisture1_mean['not ideal low'] | soilMoisture1_mean['not ideal high'] |
+            soilMoisture2_mean['not ideal low'] | soilMoisture2_mean['not ideal high'] |
+            soilMoisture3_mean['not ideal low'] | soilMoisture3_mean['not ideal high'],
+            overall_status['unhealthy']
+            )
+        rule2 = ctrl.Rule(
+            humidity_mean['ideal'] & temperature_mean['ideal'] &
+            lightIntensity_mean['ideal'] & soilMoisture1_mean['ideal'] &
+            soilMoisture2_mean['ideal'] & soilMoisture3_mean['ideal'], 
+            overall_status['healthy']
+            )
+
+        overall_status_ctrl = ctrl.ControlSystem([rule1, rule2])
         return ctrl.ControlSystemSimulation(overall_status_ctrl)
+
 
     # Get the crop type (just one is enough because they are the same)
     crop_type = df['cropType'][0]
@@ -496,7 +578,7 @@ def get_fuzzy_status_combined(row, fuzzy_system, interval):
         fuzzy_system.input['soilMoisture2_mean'] = row[f'soilMoisture2_{interval}_mean']
         fuzzy_system.input['soilMoisture3_mean'] = row[f'soilMoisture3_{interval}_mean']
         fuzzy_system.compute()
-        print(f"Fuzzy system output for {interval}: {fuzzy_system.output['overall_status']}")
+        print(f"Fuzzy system output for {interval}: {fuzzy_system.output['overall_status']}%")
         return fuzzy_system.output['overall_status']
     except KeyError as e:
         print(f"KeyError: {e}")
@@ -505,7 +587,7 @@ def get_fuzzy_status_combined(row, fuzzy_system, interval):
 
 
 async def main():
-    hardwares = fetch_data("hardwares")
+    hardwares = fetch_data("users")
 
     # For speed up
     # with open("sample.txt", "r") as file:
@@ -578,7 +660,46 @@ if __name__ == "__main__":
 
 
 
+def display_trapezoidal_membership(sensor):
+    # Plot all defined membership functions
+    plt.figure(figsize=(10, 6))
+    for term_name, membership_function in sensor.terms.items():
+        plt.plot(sensor.universe, membership_function.mf, label=term_name)
 
+    # Add titles and legend
+    plt.title(f'Membership Functions for {sensor.label}')
+    plt.xlabel('Temperature (°C)')
+    plt.ylabel('Membership Degree')
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+
+# def display_calculated_membership(sensor_dict):
+#     data = []
+#     for sensor_name, sensor in sensor_dict.items():
+#         value_to_check = sensor_data[sensor_name.split('_')[0]]
+        
+#         # Calculate the membership values for the specified sensor value
+#         low_membership = fuzz.interp_membership(sensor.universe, sensor['not ideal low'].mf, value_to_check)
+#         ideal_membership = fuzz.interp_membership(sensor.universe, sensor['ideal'].mf, value_to_check)
+#         high_membership = fuzz.interp_membership(sensor.universe, sensor['not ideal high'].mf, value_to_check)
+        
+#         data.append({
+#             "Sensor": sensor_name,
+#             "Value": value_to_check,
+#             "Low": low_membership,
+#             "Ideal": ideal_membership,
+#             "High": high_membership
+#         })
+
+#     # Create DataFrame
+#     df = pd.DataFrame(data)
+
+#     # with open("sensorFuzzyDF.txt", "w") as f:
+#     #     f.write(df.to_string())
+
+#     print(df)
 
 
 

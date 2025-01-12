@@ -2,13 +2,13 @@
     {
         "hardware120502": {
             "2025-01-01-19:57": {
-                "humidity": -1.0,
-                "soilMoisture2": 95.0,
-                "soilMoisture3": 95.0,
+                "humidity": 70,
+                "soilMoisture2": 69,
+                "soilMoisture3": 67,
                 "createdAt": "2025-01-01 19:57",
-                "lightIntensity": 1.0,
-                "soilMoisture1": 90.0,
-                "temperature": -1.0,
+                "temperature": 22,
+                "soilMoisture1": 50,
+                "lightIntensity": 80,
                 "cropType": "tomato"
             },
             "2025-01-07-23:03": {
